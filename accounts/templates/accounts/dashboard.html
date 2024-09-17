@@ -1,0 +1,92 @@
+{% extends 'main/base.html' %}
+{% load custom_filters %}
+{% block content %}
+    <div>
+        <a href="{% url 'history' %}" class="button">View Pick History</a>
+    </div>
+   <h1>Week {{ current_week }}</h1>
+
+   <!-- Display User Statistics -->
+    <div class="user-stats">
+        <h3>Your Record:</h3>
+        <div class="stats-container">
+            <div class="stats-item">Wins: {{ user_stats.wins }}</div>
+            <div class="stats-item">Losses: {{ user_stats.losses }}</div>
+            <div class="stats-item">Ties: {{ user_stats.ties }}</div>
+        </div>
+    </div>
+   <div class="games-container">
+       {% for game_info in game_data %}
+            <div class="card">
+                <div class="card-header">{{ game_info.game.away_team }} @ {{ game_info.game.home_team }}</div>
+                <div class="row">
+                    <div>
+                        <strong>Game Date:</strong> {{ game_info.game.game_date }}
+                    </div>
+                    <div>
+                        <strong>Away Score:</strong> {{ game_info.score.away_score|default:"N/A" }}
+                    </div>
+                    <div>
+                        <strong>Home Score:</strong> {{ game_info.score.home_score|default:"N/A" }}
+                    </div>
+                    <div>
+                        <strong>Winner:</strong> {{ game_info.winner }}
+                    </div>
+                    <div>
+                        {% if game_info.pick_status == "Not Picked" and game_info.pick_available %}
+                            <form method="post" action="{% url 'make_pick' game_info.game.game_id %}">
+                                {% csrf_token %}
+                                <button type="button" id="away-btn-{{ game_info.game.game_id }}"
+                                        class="pick-button {% if game_info.pick_status == 'away' %}selected{% endif %}"
+                                        data-team="away"
+                                        data-game-start="{{ game_info.game.game_date }}T20:00:00Z">
+                                    Pick {{ game_info.game.away_team }}
+                                </button>
+                                <button type="button" id="home-btn-{{ game_info.game.game_id }}"
+                                        class="pick-button {% if game_info.pick_status == 'home' %}selected{% endif %}"
+                                        data-team="home"
+                                        data-game-start="{{ game_info.game.game_date }}T20:00:00Z">
+                                    Pick {{ game_info.game.home_team }}
+                                </button>
+                                <input type="hidden" name="team_picked" id="team-picked-{{ game_info.game.game_id }}" value="{{ game_info.pick_status }}">
+                            </form>
+                        {% else %}
+                            {% if game_info.pick_status != "Not Picked" %}
+                                <strong>Your Pick:</strong> {{ game_info.pick_status|capfirst }}
+                            {% else %}
+                                <strong>Picks Unavailable (Game Started)</strong>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        {% empty %}
+            <p>No games available for this week.</p>
+        {% endfor %}
+
+   </div>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const pickButtons = document.querySelectorAll('.pick-button');
+
+        pickButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                // Remove 'selected' class from all buttons in the form
+                const gameId = this.id.split('-')[2]; // Extract game ID from button ID
+                const homeButton = document.getElementById(`home-btn-${gameId}`);
+                const awayButton = document.getElementById(`away-btn-${gameId}`);
+
+                homeButton.classList.remove('selected');
+                awayButton.classList.remove('selected');
+
+                // Add 'selected' class to the clicked button
+                this.classList.add('selected');
+
+                // Update the hidden input with the selected team
+                document.getElementById(`team-picked-${gameId}`).value = this.dataset.team;
+            });
+        });
+    });
+
+</script>
+{% endblock %}
