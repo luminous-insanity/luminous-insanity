@@ -4,7 +4,12 @@
     <div>
         <a href="{% url 'history' %}" class="button">View Pick History</a>
     </div>
-   <h1>Week {{ current_week }}</h1>
+   <h1>Week {{ selected_week }}</h1>
+   <div class="week-nav">
+       {% if selected_week > 1 %}<a href="?week={{ selected_week|add:'-1' }}">&laquo; Previous week</a>{% endif %}
+       {% if selected_week != current_week %}<a href="?week={{ current_week }}">This week</a>{% endif %}
+       {% if selected_week < 18 %}<a href="?week={{ selected_week|add:'1' }}">Next week &raquo;</a>{% endif %}
+   </div>
 
    <!-- Display User Statistics -->
     <div class="user-stats">
@@ -23,36 +28,42 @@
                     <div>
                         <strong>Game Date:</strong> {{ game_info.game.game_date }}
                     </div>
+                    {% if game_info.game.kickoff %}
                     <div>
-                        <strong>Away Score:</strong> {{ game_info.score.away_score|default:"N/A" }}
+                        <strong>Kickoff (picks lock):</strong> {{ game_info.game.kickoff|date:"D M j, g:i A" }} ET
+                    </div>
+                    {% endif %}
+                    <div>
+                        <strong>Away Score:</strong> {% if game_info.score %}{{ game_info.score.away_score }}{% else %}N/A{% endif %}
                     </div>
                     <div>
-                        <strong>Home Score:</strong> {{ game_info.score.home_score|default:"N/A" }}
+                        <strong>Home Score:</strong> {% if game_info.score %}{{ game_info.score.home_score }}{% else %}N/A{% endif %}
                     </div>
                     <div>
                         <strong>Winner:</strong> {{ game_info.winner }}
                     </div>
                     <div>
-                        {% if game_info.pick_status == "Not Picked" and game_info.pick_available %}
+                        {% if game_info.pick_available %}
+                            {% if game_info.pick_team %}
+                                <div><strong>Your Pick:</strong> {{ game_info.pick_team }} <small>(you can change it until kickoff)</small></div>
+                            {% endif %}
                             <form method="post" action="{% url 'make_pick' game_info.game.game_id %}">
                                 {% csrf_token %}
                                 <button type="button" id="away-btn-{{ game_info.game.game_id }}"
                                         class="pick-button {% if game_info.pick_status == 'away' %}selected{% endif %}"
-                                        data-team="away"
-                                        data-game-start="{{ game_info.game.game_date }}T20:00:00Z">
+                                        data-team="away">
                                     Pick {{ game_info.game.away_team }}
                                 </button>
                                 <button type="button" id="home-btn-{{ game_info.game.game_id }}"
                                         class="pick-button {% if game_info.pick_status == 'home' %}selected{% endif %}"
-                                        data-team="home"
-                                        data-game-start="{{ game_info.game.game_date }}T20:00:00Z">
+                                        data-team="home">
                                     Pick {{ game_info.game.home_team }}
                                 </button>
                                 <input type="hidden" name="team_picked" id="team-picked-{{ game_info.game.game_id }}" value="{{ game_info.pick_status }}">
                             </form>
                         {% else %}
-                            {% if game_info.pick_status != "Not Picked" %}
-                                <strong>Your Pick:</strong> {{ game_info.pick_status|capfirst }}
+                            {% if game_info.pick_team %}
+                                <strong>Your Pick:</strong> {{ game_info.pick_team }}
                             {% else %}
                                 <strong>Picks Unavailable (Game Started)</strong>
                             {% endif %}
@@ -65,28 +76,38 @@
         {% endfor %}
 
    </div>
-<script>
-    document.addEventListener("DOMContentLoaded", function() {
-        const pickButtons = document.querySelectorAll('.pick-button');
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const pickButtons = document.querySelectorAll('.pick-button');
 
-        pickButtons.forEach(button => {
-            button.addEventListener('click', function() {
-                // Remove 'selected' class from all buttons in the form
-                const gameId = this.id.split('-')[2]; // Extract game ID from button ID
-                const homeButton = document.getElementById(`home-btn-${gameId}`);
-                const awayButton = document.getElementById(`away-btn-${gameId}`);
+            if (sessionStorage.getItem('scrollPosition')) {
+                window.scrollTo(0, sessionStorage.getItem('scrollPosition'));
+                sessionStorage.removeItem('scrollPosition');  // Clear it after restoring
+            }
 
-                homeButton.classList.remove('selected');
-                awayButton.classList.remove('selected');
+            pickButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const gameId = this.id.split('-')[2];
+                    const homeButton = document.getElementById(`home-btn-${gameId}`);
+                    const awayButton = document.getElementById(`away-btn-${gameId}`);
 
-                // Add 'selected' class to the clicked button
-                this.classList.add('selected');
+                    homeButton.classList.remove('selected');
+                    awayButton.classList.remove('selected');
 
-                // Update the hidden input with the selected team
-                document.getElementById(`team-picked-${gameId}`).value = this.dataset.team;
+                    // Add 'selected' class to the clicked button
+                    this.classList.add('selected');
+
+                    // Update the hidden input with the selected team
+                    document.getElementById(`team-picked-${gameId}`).value = this.dataset.team;
+
+                    sessionStorage.setItem('scrollPosition', window.scrollY);
+
+                    // Delay form submission slightly to show the "blue" effect before the page reloads
+                    setTimeout(() => {
+                        this.closest('form').submit();
+                    }, 100); // Adjust the timeout duration if needed
+                });
             });
         });
-    });
-
-</script>
+    </script>
 {% endblock %}

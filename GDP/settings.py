@@ -24,12 +24,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 
 SECRET_KEY = config('SECRET_KEY')
-
+NFL_API_KEY = config('NFL_API_KEY')
+NFL_API_HOST = config('NFL_API_HOST')
+NFL_SEASON = config('NFL_SEASON', default=2026, cast=int)
+SYNC_TOKEN = config('SYNC_TOKEN', default='')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = ['GameDayPicks.pythonanywhere.com']
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+    'GameDayPicks.pythonanywhere.com',
+]
 
 
 # Application definition
@@ -116,7 +123,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'America/New_York'
 
 USE_I18N = True
 
