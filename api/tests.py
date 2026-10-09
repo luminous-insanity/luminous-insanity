@@ -230,6 +230,12 @@ class GamesNeedingScoresTests(TestCase):
         make_game(game_id="CHECKED_25H_AGO", kickoff=ago(12), scores_checked_at=ago(25))
         self.assertEqual(self.ids(), {"CHECKED_25H_AGO"})
 
+    def test_a_run_that_caught_the_game_mid_play_is_followed_up(self):
+        """With only a few runs a week, the next run must grade a game the last run saw live."""
+        make_game(game_id="SAW_IT_MIDGAME", kickoff=ago(10), scores_checked_at=ago(6.5))    # looked 3.5h after kickoff
+        make_game(game_id="LOOKED_AFTER_END", kickoff=ago(10), scores_checked_at=ago(1))   # looked 9h after kickoff
+        self.assertEqual(self.ids(), {"SAW_IT_MIDGAME"})
+
     def test_very_old_unfinished_game_is_given_up_on(self):
         make_game(game_id="OLD", kickoff=ago(24 * 20), game_date=timezone.localdate() - timedelta(days=20))
         self.assertEqual(self.ids(), set())
@@ -304,6 +310,18 @@ class RunSyncTests(TestCase):
         self.assertEqual(len(fake.calls), calls_after_first)      # no more API calls
         self.assertEqual(Game.objects.count(), games_after_first)  # no duplicates
         self.assertEqual(Game.objects.get(game_id="G1").home_score, 27)
+
+    def test_two_widely_spaced_runs_grade_a_late_game(self):
+        """Thursday 11:45 PM run sees it live; the Friday morning run must finish the job."""
+        make_game(game_id="TNF", kickoff=ago(10), scores_checked_at=ago(6.5), status=Game.LIVE)
+        fake = FakeApi(
+            scores={1: {"TNF": raw_score(2, 24, 20)}},
+            schedules={2: [raw_game("NEXT", "NYG", "DAL", hours_from_now(24 * 5))]},
+        )
+        report = self.run_with(fake)
+        game = Game.objects.get(game_id="TNF")
+        self.assertEqual((game.status, game.home_score, game.away_score), (Game.FINAL, 24, 20))
+        self.assertEqual(report["final_games"], 1)
 
     def test_api_failure_is_reported_not_raised(self):
         make_game(game_id="G1", kickoff=ago(5))

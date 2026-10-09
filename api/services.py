@@ -32,6 +32,7 @@ REQUEST_TIMEOUT = 15     # seconds; never let a hung request freeze the site
 LIVE_RECHECK = timedelta(minutes=10)
 STALE_RECHECK = timedelta(hours=24)
 LIVE_WINDOW = timedelta(hours=8)     # how long after kickoff we poll often
+EXPECTED_LENGTH = timedelta(hours=5)  # NFL games run about 3.5 hours; leave margin
 GIVE_UP_AFTER_DAYS = 14              # stop auto-polling games this old
 
 
@@ -129,10 +130,23 @@ def games_needing_scores(now=None):
                   .exclude(status=Game.FINAL))
     needed = []
     for game in candidates:
-        if now < game.lock_at:
+        started = game.lock_at
+        if now < started:
             continue                                   # hasn't kicked off
-        wait = LIVE_RECHECK if game.lock_at > now - LIVE_WINDOW else STALE_RECHECK
-        if game.scores_checked_at is None or game.scores_checked_at < now - wait:
+        checked = game.scores_checked_at
+        if checked is None:
+            needed.append(game)
+            continue
+        # If our last look happened before the game could have finished (for
+        # example a run at 11:45 PM caught it mid-game), the next run must look
+        # again, however much later it is. This is what makes a schedule with
+        # only a few runs a week work.
+        looked_too_early = checked < started + EXPECTED_LENGTH
+        if now - started <= LIVE_WINDOW or looked_too_early:
+            wait = LIVE_RECHECK
+        else:
+            wait = STALE_RECHECK     # still unfinished long after it should have ended
+        if checked < now - wait:
             needed.append(game)
     return needed
 
