@@ -2,7 +2,10 @@
 #
 # Run everything with:   python manage.py test
 # Run only this file:    python manage.py test accounts
-from datetime import timedelta
+import re
+from datetime import datetime, timedelta
+from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
@@ -11,7 +14,9 @@ from django.utils import timezone
 
 from accounts.models import Pick
 from accounts.standings import compute_standings, standing_for
+from accounts.views import get_kickoff_label
 from api.helpers_for_tests import make_final, make_game
+from api.models import Game
 
 SETTINGS = dict(NFL_SEASON=2026)
 
@@ -131,7 +136,8 @@ class DashboardTests(TestCase):
         game = make_game()
         Pick.objects.create(user=self.user, game=game, team_picked="home")
         response = self.client.get(self.url)
-        self.assertContains(response, "Your Pick:</strong> KC")
+        self.assertEqual(response.context["game_data"][0]["pick_team"], "KC")
+        self.assertContains(response, 'class="your-pick"')
         self.assertContains(response, 'name="team_picked"')              # buttons stay until kickoff
         self.assertContains(response, "pick-button selected", count=1)   # your pick is highlighted
 
@@ -139,7 +145,8 @@ class DashboardTests(TestCase):
         game = make_game(kickoff=ago(1))
         Pick.objects.create(user=self.user, game=game, team_picked="away")
         response = self.client.get(self.url)
-        self.assertContains(response, "Your Pick:</strong> BAL")
+        self.assertEqual(response.context["game_data"][0]["pick_team"], "BAL")
+        self.assertContains(response, 'class="your-pick"')
         self.assertNotContains(response, 'name="team_picked"')
 
     def test_open_unpicked_game_offers_pick_buttons(self):
@@ -152,26 +159,62 @@ class DashboardTests(TestCase):
     def test_started_unpicked_game_is_locked(self):
         make_game(kickoff=ago(1))
         response = self.client.get(self.url)
-        self.assertContains(response, "Picks Unavailable (Game Started)")
+        self.assertContains(response, "Picks unavailable (game started)")
         self.assertNotContains(response, 'name="team_picked"')
 
-    def test_kickoff_time_is_shown(self):
-        make_game()
-        self.assertContains(self.client.get(self.url), "Kickoff (picks lock):")
-
-    def test_unplayed_game_shows_na(self):
+    def test_status_bar_shows_the_kickoff_label(self):
         make_game()
         response = self.client.get(self.url)
-        self.assertContains(response, "Away Score:</strong> N/A")
-        self.assertContains(response, "Winner:</strong> N/A")
+        label = response.context["game_data"][0]["kickoff_label"]
+        self.assertIn(" · ", label)              # e.g. "TOMORROW · 1:00 PM"
+        self.assertContains(response, label)
+
+    def test_unplayed_game_shows_dashes_and_no_winner(self):
+        make_game()
+        response = self.client.get(self.url)
+        self.assertIsNone(response.context["game_data"][0]["score"])
+        self.assertEqual(self.score_cells(response), ["—", "—"])
+        self.assertNotContains(response, "winning-score")
+
+    def score_cells(self, response):
+        """The two big numbers on the card, away first then home."""
+        return re.findall(r'<span class="team-score[^"]*">\s*(\S+)\s*</span>', response.content.decode())
 
     def test_a_score_of_zero_is_shown_as_zero(self):
         """The old page printed N/A for a shutout."""
         make_final(make_game(), 17, 0)
         response = self.client.get(self.url)
-        self.assertContains(response, "Away Score:</strong> 0")
-        self.assertContains(response, "Home Score:</strong> 17")
-        self.assertContains(response, "Winner:</strong> KC")
+        self.assertEqual(self.score_cells(response), ["0", "17"])
+        self.assertEqual(response.context["game_data"][0]["winner"], "KC")
+
+    def test_winner_is_highlighted_and_a_tie_is_not(self):
+        make_final(make_game(), 27, 20)
+        response = self.client.get(self.url)
+        classes = re.findall(r'<span class="(team-score[^"]*)">', response.content.decode())
+        self.assertNotIn("winning-score", classes[0])    # away lost
+        self.assertIn("winning-score", classes[1])       # home won
+        Game.objects.all().delete()
+        make_final(make_game(), 20, 20)
+        self.assertNotContains(self.client.get(self.url), "winning-score")
+
+    def test_live_scores_are_hidden_until_the_game_is_final(self):
+        """A score saved mid-game would sit on the page for hours, out of date."""
+        make_game(status=Game.LIVE, home_score=17, away_score=14, kickoff=ago(1))
+        response = self.client.get(self.url)
+        self.assertIsNone(response.context["game_data"][0]["score"])
+        self.assertEqual(self.score_cells(response), ["—", "—"])
+        self.assertNotContains(response, "winning-score")
+
+    def test_status_badges(self):
+        make_final(make_game(), 27, 20)
+        response = self.client.get(self.url)
+        self.assertContains(response, "status-badge final")
+        self.assertContains(response, "GAME COMPLETE")
+        Game.objects.all().delete()
+        make_game(kickoff=ago(1))        # started, no final yet
+        response = self.client.get(self.url)
+        self.assertContains(response, "status-badge live")
+        self.assertContains(response, "LIVE GAME")
 
     def test_your_record_is_shown(self):
         game = make_final(make_game(), 27, 20)
@@ -209,6 +252,54 @@ class DashboardTests(TestCase):
         response = self.client.get(self.url)
         self.assertContains(response, "Pick KC")
         self.assertNotContains(response, "Pick SEA")
+
+
+# ------------------------------------------------------------ kickoff label --
+
+NOW = datetime(2026, 10, 11, 10, 0, tzinfo=ZoneInfo("America/New_York"))   # Sunday 10:00 AM Eastern
+
+
+def kick(days=0, hour=13, minute=0):
+    return (NOW + timedelta(days=days)).replace(hour=hour, minute=minute)
+
+
+@override_settings(TIME_ZONE="America/New_York")
+class KickoffLabelTests(TestCase):
+    """The text in the top bar of each game card."""
+
+    def label(self, **overrides):
+        game = make_game(**overrides)
+        with patch("django.utils.timezone.now", return_value=NOW):
+            return get_kickoff_label(game)
+
+    def test_later_today(self):
+        self.assertEqual(self.label(kickoff=kick(0, 13)), "TODAY · 1:00 PM")
+
+    def test_just_before_midnight_is_still_today(self):
+        self.assertEqual(self.label(kickoff=kick(0, 23, 30)), "TODAY · 11:30 PM")
+
+    def test_tomorrow(self):
+        self.assertEqual(self.label(kickoff=kick(1, 13)), "TOMORROW · 1:00 PM")
+
+    def test_later_this_week(self):
+        self.assertEqual(self.label(kickoff=kick(3, 20, 15)), "Wed, Oct 14 · 8:15 PM")
+
+    def test_single_digit_day_has_no_leading_zero(self):
+        kickoff = datetime(2026, 11, 5, 13, 0, tzinfo=ZoneInfo("America/New_York"))
+        self.assertEqual(self.label(kickoff=kickoff), "Thu, Nov 5 · 1:00 PM")
+
+    def test_started_but_not_final_says_in_progress(self):
+        self.assertEqual(self.label(kickoff=kick(0, 9)), "IN PROGRESS")
+
+    def test_live_status_says_in_progress(self):
+        self.assertEqual(self.label(status=Game.LIVE, kickoff=kick(0, 9)), "IN PROGRESS")
+
+    def test_final(self):
+        label = self.label(status=Game.FINAL, home_score=27, away_score=20, kickoff=kick(-1, 13))
+        self.assertEqual(label, "FINAL")
+
+    def test_no_kickoff_time(self):
+        self.assertEqual(self.label(kickoff=None), "TIME TBD")
 
 
 # --------------------------------------------------------------- make_pick --

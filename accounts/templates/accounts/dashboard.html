@@ -21,61 +21,95 @@
         </div>
     </div>
    <div class="games-container">
-       {% for game_info in game_data %}
-            <div class="card">
-                <div class="card-header">{{ game_info.game.away_team }} @ {{ game_info.game.home_team }}</div>
-                <div class="row">
-                    <div>
-                        <strong>Game Date:</strong> {{ game_info.game.game_date }}
-                    </div>
-                    {% if game_info.game.kickoff %}
-                    <div>
-                        <strong>Kickoff (picks lock):</strong> {{ game_info.game.kickoff|date:"D M j, g:i A" }} ET
-                    </div>
+        {% for game_info in game_data %}
+            <div class="game-card">
+
+                <div class="card-header">
+                    {% if game_info.kickoff_label == "FINAL" %}
+                        <span class="kickoff-text">GAME COMPLETE</span>
+                        <span class="status-badge final">FINAL</span>
+                    {% elif game_info.kickoff_label == "IN PROGRESS" %}
+                        <span class="kickoff-text">LIVE GAME</span>
+                        <span class="status-badge live">IN PROGRESS</span>
+                    {% else %}
+                        <span class="kickoff-text">
+                            {{ game_info.kickoff_label }}
+                        </span>
                     {% endif %}
-                    <div>
-                        <strong>Away Score:</strong> {% if game_info.score %}{{ game_info.score.away_score }}{% else %}N/A{% endif %}
-                    </div>
-                    <div>
-                        <strong>Home Score:</strong> {% if game_info.score %}{{ game_info.score.home_score }}{% else %}N/A{% endif %}
-                    </div>
-                    <div>
-                        <strong>Winner:</strong> {{ game_info.winner }}
-                    </div>
-                    <div>
-                        {% if game_info.pick_available %}
-                            {% if game_info.pick_team %}
-                                <div><strong>Your Pick:</strong> {{ game_info.pick_team }} <small>(you can change it until kickoff)</small></div>
-                            {% endif %}
-                            <form method="post" action="{% url 'make_pick' game_info.game.game_id %}">
-                                {% csrf_token %}
-                                <button type="button" id="away-btn-{{ game_info.game.game_id }}"
+                </div>
+
+                <div class="game-team">
+                    <span class="team-name">
+                        {{ game_info.game.away_team }}
+                    </span>
+                    <span class="team-score {% if game_info.score and game_info.score.away_score > game_info.score.home_score %}winning-score{% endif %}">
+                        {% if game_info.score %}
+                            {{ game_info.score.away_score }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </span>
+                </div>
+
+                <div class="game-team">
+                    <span class="team-name">
+                        {{ game_info.game.home_team }}
+                    </span>
+                    <span class="team-score {% if game_info.score and game_info.score.home_score > game_info.score.away_score %}winning-score{% endif %}">
+                        {% if game_info.score %}
+                            {{ game_info.score.home_score }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </span>
+                </div>
+
+                <div class="game-pick">
+                    {% if game_info.pick_team %}
+                        <div class="your-pick">
+                            <span>Your Pick</span>
+                            <strong>{{ game_info.pick_team }}</strong>
+                        </div>
+                    {% endif %}
+
+                    {% if game_info.pick_available %}
+                        <form method="post"
+                              action="{% url 'make_pick' game_info.game.game_id %}">
+                            {% csrf_token %}
+
+                            <div class="pick-buttons">
+                                <button type="button"
+                                        id="away-btn-{{ game_info.game.game_id }}"
                                         class="pick-button {% if game_info.pick_status == 'away' %}selected{% endif %}"
                                         data-team="away">
                                     Pick {{ game_info.game.away_team }}
                                 </button>
-                                <button type="button" id="home-btn-{{ game_info.game.game_id }}"
+
+                                <button type="button"
+                                        id="home-btn-{{ game_info.game.game_id }}"
                                         class="pick-button {% if game_info.pick_status == 'home' %}selected{% endif %}"
                                         data-team="home">
                                     Pick {{ game_info.game.home_team }}
                                 </button>
-                                <input type="hidden" name="team_picked" id="team-picked-{{ game_info.game.game_id }}" value="{{ game_info.pick_status }}">
-                            </form>
-                        {% else %}
-                            {% if game_info.pick_team %}
-                                <strong>Your Pick:</strong> {{ game_info.pick_team }}
-                            {% else %}
-                                <strong>Picks Unavailable (Game Started)</strong>
-                            {% endif %}
-                        {% endif %}
-                    </div>
+                            </div>
+
+                            <input type="hidden"
+                                   name="team_picked"
+                                   id="team-picked-{{ game_info.game.game_id }}"
+                                   value="{{ game_info.pick_status }}">
+                        </form>
+                    {% elif not game_info.pick_team %}
+                        <div class="pick-locked">
+                            Picks unavailable (game started)
+                        </div>
+                    {% endif %}
                 </div>
+
             </div>
         {% empty %}
             <p>No games available for this week.</p>
         {% endfor %}
-
-   </div>
+    </div>
     <script>
         document.addEventListener("DOMContentLoaded", function() {
             const pickButtons = document.querySelectorAll('.pick-button');

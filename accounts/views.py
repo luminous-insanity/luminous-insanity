@@ -7,7 +7,8 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
-
+from datetime import timedelta
+from django.utils import timezone
 from api.models import Game
 from api.services import MAX_WEEK, current_week
 from .forms import LoginForm, SignUpForm
@@ -81,11 +82,14 @@ def dashboard(request, week_number=None):
 
     game_data = []
     for game in games:
-        has_scores = game.home_score is not None and game.away_score is not None
+        # Only show a score once the game is final. The sync checks a few times a
+        # day, so a score saved mid-game would sit on the page, stale, for hours.
+        has_scores = game.is_final
         game_data.append({
             'game': game,
             # The Game itself carries home_score / away_score, so templates
             # that use item.score.home_score keep working.
+            'kickoff_label': get_kickoff_label(game),
             'score': game if has_scores else None,
             'winner': game.winner_name or 'N/A',
             'pick_status': picks.get(game.pk, 'Not Picked'),
@@ -101,6 +105,46 @@ def dashboard(request, week_number=None):
     }
     return render(request, 'accounts/dashboard.html', context)
 
+def get_kickoff_label(game):
+    now = timezone.localtime()
+
+    # Normalize the API status
+    status = (game.status or "").strip().lower().replace("-", "_").replace(" ", "_")
+
+    # Completed games
+    if status in {
+        "final", "completed", "complete", "finished",
+        "game_over", "closed"
+    } or "final" in status:
+        return "FINAL"
+
+    # Games currently being played
+    if status in {
+        "in_progress", "inprogress", "live", "in_play",
+        "inprogress_period"
+    } or "in_progress" in status:
+        return "IN PROGRESS"
+
+    # No kickoff time available
+    if not game.kickoff:
+        return "TIME TBD"
+
+    kickoff = timezone.localtime(game.kickoff)
+    time_label = kickoff.strftime("%I:%M %p").lstrip("0")
+
+    # Future games
+    if kickoff > now:
+        if kickoff.date() == now.date():
+            return f"TODAY · {time_label}"
+
+        if kickoff.date() == now.date() + timedelta(days=1):
+            return f"TOMORROW · {time_label}"
+
+        date_label = f"{kickoff.strftime('%a, %b')} {kickoff.day}"   # "Nov 5", not "Nov 05"
+        return f"{date_label} · {time_label}"
+
+    # Kickoff has passed, but the API has not reported a final status
+    return "IN PROGRESS"
 
 @login_required
 @require_POST

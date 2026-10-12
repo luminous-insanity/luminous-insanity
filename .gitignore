@@ -3,13 +3,19 @@
 *.pyo
 __pycache__/
 
+# Virtual environment and editor files
+.venv/
+venv/
+.idea/
+
 # Django
 *.log
 *.sqlite3
 db.sqlite3
 
-# Environment files
+# Environment files (secrets)
 .env
 
-# Static files
-/static/
+# Collected static files. collectstatic creates these; never commit them.
+# (Your own CSS lives in /static/ and MUST be committed, so don't ignore that folder.)
+/staticfiles/
