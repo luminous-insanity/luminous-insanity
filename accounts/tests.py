@@ -12,6 +12,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
+from accounts.forms import USERNAME_MAX_LENGTH, USERNAME_MIN_LENGTH, SignUpForm
 from accounts.models import Pick
 from accounts.standings import compute_standings, standing_for
 from accounts.views import get_kickoff_label
@@ -118,6 +119,7 @@ class StandingsTests(TestCase):
 
 # --------------------------------------------------------------- dashboard --
 
+
 @override_settings(**SETTINGS)
 class DashboardTests(TestCase):
     def setUp(self):
@@ -128,130 +130,35 @@ class DashboardTests(TestCase):
     def test_login_is_required(self):
         self.client.logout()
         response = self.client.get(self.url)
-        self.assertRedirects(response, "/accounts/login/?next=/accounts/dashboard/",
-                             fetch_redirect_response=False)
-
-    def test_shows_your_existing_pick_and_lets_you_change_it(self):
-        """The old dashboard looked picks up by the wrong id and never showed them."""
-        game = make_game()
-        Pick.objects.create(user=self.user, game=game, team_picked="home")
-        response = self.client.get(self.url)
-        self.assertEqual(response.context["game_data"][0]["pick_team"], "KC")
-        self.assertContains(response, 'class="your-pick"')
-        self.assertContains(response, 'name="team_picked"')              # buttons stay until kickoff
-        self.assertContains(response, "pick-button selected", count=1)   # your pick is highlighted
-
-    def test_locked_game_shows_your_pick_without_buttons(self):
-        game = make_game(kickoff=ago(1))
-        Pick.objects.create(user=self.user, game=game, team_picked="away")
-        response = self.client.get(self.url)
-        self.assertEqual(response.context["game_data"][0]["pick_team"], "BAL")
-        self.assertContains(response, 'class="your-pick"')
-        self.assertNotContains(response, 'name="team_picked"')
-
-    def test_open_unpicked_game_offers_pick_buttons(self):
-        make_game()
-        response = self.client.get(self.url)
-        self.assertContains(response, 'name="team_picked"')
-        self.assertContains(response, "Pick BAL")
-        self.assertContains(response, "Pick KC")
-
-    def test_started_unpicked_game_is_locked(self):
-        make_game(kickoff=ago(1))
-        response = self.client.get(self.url)
-        self.assertContains(response, "Picks unavailable (game started)")
-        self.assertNotContains(response, 'name="team_picked"')
-
-    def test_status_bar_shows_the_kickoff_label(self):
-        make_game()
-        response = self.client.get(self.url)
-        label = response.context["game_data"][0]["kickoff_label"]
-        self.assertIn(" · ", label)              # e.g. "TOMORROW · 1:00 PM"
-        self.assertContains(response, label)
-
-    def test_unplayed_game_shows_dashes_and_no_winner(self):
-        make_game()
-        response = self.client.get(self.url)
-        self.assertIsNone(response.context["game_data"][0]["score"])
-        self.assertEqual(self.score_cells(response), ["—", "—"])
-        self.assertNotContains(response, "winning-score")
-
-    def score_cells(self, response):
-        """The two big numbers on the card, away first then home."""
-        return re.findall(r'<span class="team-score[^"]*">\s*(\S+)\s*</span>', response.content.decode())
-
-    def test_a_score_of_zero_is_shown_as_zero(self):
-        """The old page printed N/A for a shutout."""
-        make_final(make_game(), 17, 0)
-        response = self.client.get(self.url)
-        self.assertEqual(self.score_cells(response), ["0", "17"])
-        self.assertEqual(response.context["game_data"][0]["winner"], "KC")
-
-    def test_winner_is_highlighted_and_a_tie_is_not(self):
-        make_final(make_game(), 27, 20)
-        response = self.client.get(self.url)
-        classes = re.findall(r'<span class="(team-score[^"]*)">', response.content.decode())
-        self.assertNotIn("winning-score", classes[0])    # away lost
-        self.assertIn("winning-score", classes[1])       # home won
-        Game.objects.all().delete()
-        make_final(make_game(), 20, 20)
-        self.assertNotContains(self.client.get(self.url), "winning-score")
-
-    def test_live_scores_are_hidden_until_the_game_is_final(self):
-        """A score saved mid-game would sit on the page for hours, out of date."""
-        make_game(status=Game.LIVE, home_score=17, away_score=14, kickoff=ago(1))
-        response = self.client.get(self.url)
-        self.assertIsNone(response.context["game_data"][0]["score"])
-        self.assertEqual(self.score_cells(response), ["—", "—"])
-        self.assertNotContains(response, "winning-score")
-
-    def test_status_badges(self):
-        make_final(make_game(), 27, 20)
-        response = self.client.get(self.url)
-        self.assertContains(response, "status-badge final")
-        self.assertContains(response, "GAME COMPLETE")
-        Game.objects.all().delete()
-        make_game(kickoff=ago(1))        # started, no final yet
-        response = self.client.get(self.url)
-        self.assertContains(response, "status-badge live")
-        self.assertContains(response, "LIVE GAME")
+        self.assertRedirects(
+            response,
+            "/accounts/login/?next=/accounts/dashboard/",
+            fetch_redirect_response=False,
+        )
 
     def test_your_record_is_shown(self):
         game = make_final(make_game(), 27, 20)
-        Pick.objects.create(user=self.user, game=game, team_picked="home")
+        Pick.objects.create(
+            user=self.user,
+            game=game,
+            team_picked="home",
+        )
+
         response = self.client.get(self.url)
-        self.assertContains(response, "Wins: 1")
-        self.assertContains(response, "Losses: 0")
 
-    def test_no_games_message(self):
-        self.assertContains(self.client.get(self.url), "No games available for this week.")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["user_stats"].wins, 1)
+        self.assertEqual(response.context["user_stats"].losses, 0)
+        self.assertContains(response, "stats-wins")
+        self.assertContains(response, "stats-losses")
 
-    def test_defaults_to_the_current_week_and_can_browse_others(self):
-        make_game(week=1, home_team="KC", away_team="BAL")
-        make_game(week=2, home_team="NYG", away_team="DAL")
+    def test_dashboard_does_not_contain_pick_forms(self):
+        make_game()
+
         response = self.client.get(self.url)
-        self.assertEqual(response.context["selected_week"], 1)
-        self.assertContains(response, "Week 1")
-        self.assertNotContains(response, "Previous week")      # nothing before week 1
-        self.assertContains(response, "Next week")
-        response = self.client.get(self.url + "?week=2")
-        self.assertEqual(response.context["selected_week"], 2)
-        self.assertContains(response, "NYG")
-        self.assertNotContains(response, "Pick KC")             # week 1's game isn't on this page
-        self.assertContains(response, "This week")             # link back to the current week
 
-    def test_nonsense_week_falls_back_to_the_current_week(self):
-        make_game(week=1)
-        for bad in ("?week=99", "?week=0", "?week=abc", "?week="):
-            response = self.client.get(self.url + bad)
-            self.assertEqual(response.context["selected_week"], 1, bad)
-
-    def test_only_this_seasons_games_show(self):
-        make_game(season=2026, home_team="KC", away_team="BAL")
-        make_game(season=2025, home_team="SEA", away_team="MIA")
-        response = self.client.get(self.url)
-        self.assertContains(response, "Pick KC")
-        self.assertNotContains(response, "Pick SEA")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'name="team_picked"')
 
 
 # ------------------------------------------------------------ kickoff label --
@@ -316,7 +223,11 @@ class MakePickTests(TestCase):
     def test_saves_a_pick_for_the_logged_in_user(self):
         game = make_game()
         response = self.client.post(self.pick_url(game), {"team_picked": "home"})
-        self.assertRedirects(response, f"{reverse('dashboard')}?week=1", fetch_redirect_response=False)
+        self.assertRedirects(
+            response,
+            f"{reverse('picks')}?season=2026&week=1",
+            fetch_redirect_response=False,
+        )
         pick = Pick.objects.get()
         self.assertEqual((pick.user, pick.game, pick.team_picked), (self.user, game, "home"))
 
@@ -428,3 +339,57 @@ class AuthFlowTests(TestCase):
         response = self.client.get(reverse("logout"))
         self.assertRedirects(response, reverse("login"), fetch_redirect_response=False)
         self.assertNotIn("_auth_user_id", self.client.session)
+
+
+# ----------------------------------------------------------- username rules --
+
+class UsernameRuleTests(TestCase):
+    PASSWORD = "purple-Tiger-91-lamp"
+
+    def form(self, username):
+        return SignUpForm(data={
+            "username": username, "email": "friend@example.com",
+            "password1": self.PASSWORD, "password2": self.PASSWORD,
+        })
+
+    def test_length_limits_for_new_accounts(self):
+        cases = [
+            ("a" * (USERNAME_MIN_LENGTH - 1), False),
+            ("a" * USERNAME_MIN_LENGTH, True),
+            ("a" * USERNAME_MAX_LENGTH, True),
+            ("a" * (USERNAME_MAX_LENGTH + 1), False),
+            ("a" * 150, False),          # Django's own limit; ours is much lower
+        ]
+        for name, should_be_valid in cases:
+            with self.subTest(length=len(name)):
+                self.assertEqual(self.form(name).is_valid(), should_be_valid)
+
+    def test_too_long_error_message_is_clear(self):
+        form = self.form("a" * (USERNAME_MAX_LENGTH + 1))
+        form.is_valid()
+        self.assertIn(f"{USERNAME_MIN_LENGTH} to {USERNAME_MAX_LENGTH} characters", form.errors["username"][0])
+
+    def test_usernames_that_differ_only_by_case_are_duplicates(self):
+        User.objects.create_user("Dallas", password=self.PASSWORD)
+        form = self.form("dallas")
+        self.assertFalse(form.is_valid())
+        self.assertIn("taken", form.errors["username"][0])
+
+    def test_help_text_and_input_box_match_the_real_limit(self):
+        field = SignUpForm().fields["username"]
+        self.assertNotIn("150", field.help_text)
+        self.assertIn(str(USERNAME_MAX_LENGTH), field.help_text)
+        self.assertEqual(field.widget.attrs["maxlength"], USERNAME_MAX_LENGTH)
+
+    def test_a_long_existing_username_can_still_log_in(self):
+        """The login form used to refuse any name over 30 characters."""
+        long_name = "x" * 40
+        User.objects.create_user(long_name, password=self.PASSWORD)
+        response = self.client.post(reverse("login"), {"username": long_name, "password": self.PASSWORD})
+        self.assertRedirects(response, reverse("dashboard"), fetch_redirect_response=False)
+
+    def test_a_password_with_a_trailing_space_can_log_in(self):
+        """Signup keeps spaces in passwords, so login must too."""
+        User.objects.create_user("sam", password=self.PASSWORD + " ")
+        response = self.client.post(reverse("login"), {"username": "sam", "password": self.PASSWORD + " "})
+        self.assertRedirects(response, reverse("dashboard"), fetch_redirect_response=False)

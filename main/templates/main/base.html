@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,23 +17,36 @@
 </head>
 <body>
     <header>
-        <a href="{% url 'home' %}" class="header-link"><h1>GameDayPicks</h1></a>
-        <nav>
-            {% if request.path == '/' %}
+        <a href="{% url 'home' %}" class="header-link">
+            <h1>GameDayPicks</h1>
+        </a>
+        <div class="header-right">
+            <button type="button"
+                    class="menu-toggle"
+                    id="menu-toggle"
+                    aria-label="Open navigation menu"
+                    aria-expanded="false"
+                    aria-controls="site-nav">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
 
-                <a href="{% url 'dashboard' %}" class="button">Dashboard</a>
-            {% else %}
+            <nav id="site-nav" class="site-nav">
                 <a href="{% url 'home' %}" class="button">Home</a>
+                <a href="{% url 'leaderboard' %}" class="button">Leaderboard</a>
 
-            {% endif %}
-
-            {% if user.is_authenticated %}
-                <a href="{% url 'logout' %}" class="button">Logout</a>
-            {% else %}
-                <a href="{% url 'signup' %}" class="button">Sign Up</a>
-                <a href="{% url 'login' %}" class="button">Login</a>
-            {% endif %}
-        </nav>
+                {% if user.is_authenticated %}
+                    <a href="{% url 'dashboard' %}" class="button">Dashboard</a>
+                    <a href="{% url 'picks' %}" class="button">Make Picks</a>
+                    <a href="{% url 'profile' %}" class="button">Profile</a>
+                    <a href="{% url 'logout' %}" class="button">Logout</a>
+                {% else %}
+                    <a href="{% url 'signup' %}" class="button">Sign Up</a>
+                    <a href="{% url 'login' %}" class="button">Login</a>
+                {% endif %}
+            </nav>
+        </div>
     </header>
 
     <div class="container">
@@ -46,8 +59,67 @@
         {% endblock %}
     </div>
 
-    <footer>
-        <p>&copy; 2024 My Website</p>
-    </footer>
+        <footer class="site-footer">
+            <div class="footer-main">
+                <div class="footer-brand">
+                    <a href="{% url 'home' %}" class="footer-logo">
+                        GAMEDAYPICKS
+                    </a>
+                    <p>
+                        Every game matters. Make your picks, compete with
+                        your friends, and fight for bragging rights.
+                    </p>
+                </div>
+
+                <div class="footer-links">
+                    <h3>EXPLORE</h3>
+                    <a href="{% url 'home' %}">Home</a>
+                    <a href="{% url 'leaderboard' %}">Leaderboard</a>
+                    {% if user.is_authenticated %}
+                        <a href="{% url 'picks' %}">Make Your Picks</a>
+                    {% else %}
+                        <a href="{% url 'signup' %}">Join the Game</a>
+                    {% endif %}
+                </div>
+
+                <div class="footer-links">
+                    <h3>INFORMATION</h3>
+                    <a href="{% url 'about' %}">About</a>
+                    <a href="{% url 'contact' %}">Contact</a>
+                    <a href="{% url 'privacy' %}">Privacy Policy</a>
+                    <a href="{% url 'terms' %}">Terms of Service</a>
+                </div>
+            </div>
+
+            <div class="footer-bottom">
+                <p>© {% now "Y" %} GameDayPicks. All rights reserved.</p>
+                <p>Built for the love of the game.</p>
+            </div>
+        </footer>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const toggle = document.getElementById("menu-toggle");
+            const nav = document.getElementById("site-nav");
+
+            if (!toggle || !nav) return;
+
+            toggle.addEventListener("click", function () {
+                const isOpen = nav.classList.toggle("menu-open");
+                toggle.setAttribute("aria-expanded", isOpen);
+                toggle.setAttribute(
+                    "aria-label",
+                    isOpen ? "Close navigation menu" : "Open navigation menu"
+                );
+            });
+
+            document.addEventListener("click", function (event) {
+                if (!nav.contains(event.target) && !toggle.contains(event.target)) {
+                    nav.classList.remove("menu-open");
+                    toggle.setAttribute("aria-expanded", "false");
+                    toggle.setAttribute("aria-label", "Open navigation menu");
+                }
+            });
+        });
+    </script>
 </body>
 </html>

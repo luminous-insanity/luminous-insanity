@@ -1,0 +1,99 @@
+{% extends 'main/base.html' %}
+
+{% block title %}Leaderboard | GameDayPicks{% endblock %}
+
+{% block content %}
+<section class="home-leaderboard">
+
+    <div class="home-leaderboard-heading">
+        <div>
+            <p class="section-eyebrow">THE RACE FOR THE TOP</p>
+            <h2>LEADERBOARD</h2>
+            <p>Every pick counts. Every win moves you up.</p>
+        </div>
+    </div>
+
+    <form method="get" class="leaderboard-filter">
+
+        <div class="leaderboard-filter-group">
+            <label for="season">Season:</label>
+            <select name="season" id="season" onchange="this.form.submit()">
+                {% for season in seasons %}
+                    <option value="{{ season }}"
+                        {% if selected_season == season %}selected{% endif %}>
+                        {{ season }} Season
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="leaderboard-filter-group">
+            <label for="week">View standings:</label>
+            <select name="week" id="week" onchange="this.form.submit()">
+                <option value="season"
+                    {% if selected_week == 'season' %}selected{% endif %}>
+                    Season Overall
+                </option>
+
+                {% for week in weeks %}
+                    <option value="{{ week }}"
+                        {% if selected_week == week %}selected{% endif %}>
+                        Week {{ week }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <noscript>
+            <button type="submit">Show Standings</button>
+        </noscript>
+    </form>
+
+    {% if selected_week == 'season' %}
+        <h3 class="leaderboard-subheading">{{ selected_season }} Season Standings</h3>
+    {% else %}
+        <h3 class="leaderboard-subheading">
+            {{ selected_season }} Season — Week {{ selected_week }}
+        </h3>
+    {% endif %}
+
+    {% if user_stats %}
+        <div class="home-leaderboard-list">
+
+            {% for standing in user_stats %}
+                <div class="home-standing-row">
+
+                    <div class="standing-rank">
+                        {% if forloop.counter < 10 %}0{% endif %}{{ forloop.counter }}
+                    </div>
+
+                    <div class="standing-player">
+                        <strong>{{ standing.user.username }}</strong>
+                        <span>PLAYER</span>
+                    </div>
+
+                    <div class="standing-record">
+                        <strong>{{ standing.wins }}–{{ standing.losses }}–{{ standing.ties }}</strong>
+                        <span>W–L–T</span>
+                    </div>
+
+                </div>
+            {% endfor %}
+
+        </div>
+    {% else %}
+        <div class="home-leaderboard-list">
+            <p class="no-featured-games">
+                No standings are available for this selection yet.
+            </p>
+        </div>
+    {% endif %}
+
+    <div class="leaderboard-bottom-link">
+        <a href="{% url 'dashboard' %}?season={{ selected_season }}">
+            BACK TO DASHBOARD →
+        </a>
+    </div>
+
+</section>
+{% endblock %}

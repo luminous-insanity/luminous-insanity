@@ -66,34 +66,100 @@ def _selected_week(request, default):
     return week if 1 <= week <= MAX_WEEK else default
 
 
+def _available_seasons():
+    seasons = list(
+        Game.objects.order_by()
+        .values_list('season', flat=True)
+        .distinct()
+    )
+
+    if settings.NFL_SEASON not in seasons:
+        seasons.append(settings.NFL_SEASON)
+
+    return sorted(seasons, reverse=True)
+
+
+def _selected_season(request):
+    seasons = _available_seasons()
+
+    try:
+        season = int(request.GET.get('season', settings.NFL_SEASON))
+    except (TypeError, ValueError):
+        season = settings.NFL_SEASON
+
+    if season not in seasons:
+        season = settings.NFL_SEASON
+
+    return season, seasons
+
+
 @login_required
-def dashboard(request, week_number=None):
+def dashboard(request):
     current = current_week()
+    selected_season, seasons = _selected_season(request)
+
+    record_week = request.GET.get('record_week', 'season')
+
+    if record_week != 'season':
+        try:
+            record_week = int(record_week)
+            if not 1 <= record_week <= MAX_WEEK:
+                record_week = 'season'
+        except (TypeError, ValueError):
+            record_week = 'season'
+
+    if record_week == 'season':
+        user_stats = standing_for(request.user, season=selected_season)
+    else:
+        user_stats = standing_for(
+            request.user,
+            week=record_week,
+            season=selected_season,
+        )
+
+    context = {
+        'current_week': current,
+        'user_stats': user_stats,
+        'record_week': record_week,
+        'weeks': range(1, MAX_WEEK + 1),
+        'selected_season': selected_season,
+        'seasons': seasons,
+    }
+
+    return render(request, 'accounts/dashboard.html', context)
+
+
+@login_required
+def picks(request, week_number=None):
+    current = current_week()
+    selected_season, seasons = _selected_season(request)
     selected_week = week_number or _selected_week(request, current)
 
-    games = (Game.objects
-             .filter(season=settings.NFL_SEASON, week=selected_week)
-             .order_by('game_date', 'kickoff', 'id'))
+    games = (
+        Game.objects
+        .filter(season=selected_season, week=selected_week)
+        .order_by('game_date', 'kickoff', 'id')
+    )
 
-    # {Game primary key: 'home' or 'away'}. (The old code keyed this by the
-    # wrong id, so the dashboard never showed anyone's existing picks.)
-    picks = {p.game_id: p.team_picked
-             for p in Pick.objects.filter(user=request.user, game__in=games)}
+    picks_by_game = {
+        p.game_id: p.team_picked
+        for p in Pick.objects.filter(
+            user=request.user,
+            game__in=games,
+            game__season=selected_season,
+        )
+    }
 
     game_data = []
     for game in games:
-        # Only show a score once the game is final. The sync checks a few times a
-        # day, so a score saved mid-game would sit on the page, stale, for hours.
         has_scores = game.is_final
         game_data.append({
             'game': game,
-            # The Game itself carries home_score / away_score, so templates
-            # that use item.score.home_score keep working.
             'kickoff_label': get_kickoff_label(game),
             'score': game if has_scores else None,
             'winner': game.winner_name or 'N/A',
-            'pick_status': picks.get(game.pk, 'Not Picked'),
-            'pick_team': _team_name(game, picks.get(game.pk)),
+            'pick_status': picks_by_game.get(game.pk, 'Not Picked'),
+            'pick_team': _team_name(game, picks_by_game.get(game.pk)),
             'pick_available': not game.has_started,
         })
 
@@ -101,9 +167,12 @@ def dashboard(request, week_number=None):
         'current_week': current,
         'selected_week': selected_week,
         'game_data': game_data,
-        'user_stats': standing_for(request.user),
+        'selected_season': selected_season,
+        'seasons': seasons,
     }
-    return render(request, 'accounts/dashboard.html', context)
+
+    return render(request, 'accounts/picks.html', context)
+
 
 def get_kickoff_label(game):
     now = timezone.localtime()
@@ -150,7 +219,7 @@ def get_kickoff_label(game):
 @require_POST
 def make_pick(request, game_id):
     game = get_object_or_404(Game, game_id=game_id)
-    back = f"{reverse('dashboard')}?week={game.week}"
+    back = f"{reverse('picks')}?season={game.season}&week={game.week}"
 
     team_picked = request.POST.get('team_picked')
     if team_picked not in (Pick.HOME, Pick.AWAY):
