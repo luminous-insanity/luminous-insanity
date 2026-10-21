@@ -82,8 +82,10 @@
                                 {{ game_info.game.away_team }}
                             </span>
 
-                            <span class="team-name">
-                                {{ game_info.game.away_team }}
+                            <span class="team-record">
+                                {% if game_info.away_record %}
+                                    {{ game_info.away_record.wins }}-{{ game_info.away_record.losses }}-{{ game_info.away_record.ties }}
+                                {% endif %}
                             </span>
 
                             <span class="team-score {% if game_info.score and game_info.score.away_score > game_info.score.home_score %}winning-score{% endif %}">
@@ -107,8 +109,10 @@
                                 {{ game_info.game.home_team }}
                             </span>
 
-                            <span class="team-name">
-                                {{ game_info.game.home_team }}
+                            <span class="team-record">
+                                {% if game_info.home_record %}
+                                    {{ game_info.home_record.wins }}-{{ game_info.home_record.losses }}-{{ game_info.home_record.ties }}
+                                {% endif %}
                             </span>
 
                             <span class="team-score {% if game_info.score and game_info.score.home_score > game_info.score.away_score %}winning-score{% endif %}">
