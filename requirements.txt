@@ -9,7 +9,7 @@ django-apscheduler==0.6.2
 djangorestframework==3.14.0
 idna==3.8
 paypalrestsdk==1.13.3
-pillow==10.2.0
+pillow==11.0.0
 pycparser==2.22
 pyOpenSSL==24.2.1
 python-decouple==3.8
