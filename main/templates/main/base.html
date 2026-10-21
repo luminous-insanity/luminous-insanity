@@ -21,17 +21,6 @@
             <h1>GameDayPicks</h1>
         </a>
         <div class="header-right">
-            <button type="button"
-                    class="menu-toggle"
-                    id="menu-toggle"
-                    aria-label="Open navigation menu"
-                    aria-expanded="false"
-                    aria-controls="site-nav">
-                <span></span>
-                <span></span>
-                <span></span>
-            </button>
-
             <nav id="site-nav" class="site-nav">
                 <a href="{% url 'home' %}" class="button">Home</a>
                 <a href="{% url 'leaderboard' %}" class="button">Leaderboard</a>
@@ -48,6 +37,48 @@
             </nav>
         </div>
     </header>
+
+    <!-- Mobile bottom navigation -->
+    <nav class="mobile-bottom-nav" aria-label="Mobile navigation">
+        {% if user.is_authenticated %}
+            <a href="{% url 'picks' %}" class="mobile-nav-link">
+                <span class="mobile-nav-icon">🏈</span>
+                <span>My Picks</span>
+            </a>
+
+            <a href="{% url 'leaderboard' %}" class="mobile-nav-link">
+                <span class="mobile-nav-icon">🏆</span>
+                <span>Leaderboard</span>
+            </a>
+
+            <a href="{% url 'dashboard' %}" class="mobile-nav-link">
+                <span class="mobile-nav-icon">📊</span>
+                <span>Dashboard</span>
+            </a>
+        {% else %}
+            <a href="{% url 'home' %}" class="mobile-nav-link">
+                <span class="mobile-nav-icon">🏠</span>
+                <span>Home</span>
+            </a>
+
+            <a href="{% url 'leaderboard' %}" class="mobile-nav-link">
+                <span class="mobile-nav-icon">🏆</span>
+                <span>Leaderboard</span>
+            </a>
+
+            <a href="{% url 'login' %}?next={% url 'picks' %}"
+               class="mobile-nav-link">
+                <span class="mobile-nav-icon">🏈</span>
+                <span>Login</span>
+            </a>
+
+            <a href="{% url 'signup' %}" class="mobile-nav-link">
+                <span class="mobile-nav-icon">👤</span>
+                <span>Sign Up</span>
+            </a>
+        {% endif %}
+    </nav>
+
 
     <div class="container">
         {% if messages %}
@@ -96,30 +127,5 @@
                 <p>Built for the love of the game.</p>
             </div>
         </footer>
-    <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            const toggle = document.getElementById("menu-toggle");
-            const nav = document.getElementById("site-nav");
-
-            if (!toggle || !nav) return;
-
-            toggle.addEventListener("click", function () {
-                const isOpen = nav.classList.toggle("menu-open");
-                toggle.setAttribute("aria-expanded", isOpen);
-                toggle.setAttribute(
-                    "aria-label",
-                    isOpen ? "Close navigation menu" : "Open navigation menu"
-                );
-            });
-
-            document.addEventListener("click", function (event) {
-                if (!nav.contains(event.target) && !toggle.contains(event.target)) {
-                    nav.classList.remove("menu-open");
-                    toggle.setAttribute("aria-expanded", "false");
-                    toggle.setAttribute("aria-label", "Open navigation menu");
-                }
-            });
-        });
-    </script>
 </body>
 </html>
