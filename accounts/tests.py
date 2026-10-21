@@ -18,6 +18,7 @@ from accounts.standings import compute_standings, standing_for
 from accounts.views import get_kickoff_label
 from api.helpers_for_tests import make_final, make_game
 from api.models import Game
+from unittest.mock import patch
 
 SETTINGS = dict(NFL_SEASON=2026)
 

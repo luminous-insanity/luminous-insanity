@@ -1,170 +1,311 @@
+
 {% extends 'main/base.html' %}
 {% load custom_filters %}
 
 {% block content %}
-    <div class="season-header">
-        <h1>{{ selected_season }} NFL Season</h1>
 
-        <form method="get" class="season-filter">
-            <label for="season">Select season:</label>
-            <select name="season" id="season" onchange="this.form.submit()">
-                {% for season in seasons %}
-                    <option value="{{ season }}" {% if selected_season == season %}selected{% endif %}>
-                        {{ season }} Season
-                    </option>
-                {% endfor %}
-            </select>
-            <input type="hidden" name="week" value="{{ selected_week }}">
-        </form>
+<div class="season-header">
+    <h1>{{ selected_season }} NFL Season</h1>
+
+    <form method="get" class="season-filter">
+        <label for="season">Select season:</label>
+        <select name="season" id="season" onchange="this.form.submit()">
+            {% for season in seasons %}
+                <option value="{{ season }}" {% if selected_season == season %}selected{% endif %}>
+                    {{ season }} Season
+                </option>
+            {% endfor %}
+        </select>
+        <input type="hidden" name="week" value="{{ selected_week }}">
+    </form>
+</div>
+
+<div class="picks-week-section">
+    <h2 class="picks-week-title">Week {{ selected_week }}</h2>
+
+    <div class="picks-week-nav">
+        {% if selected_week > 1 %}
+            <a href="?season={{ selected_season }}&week={{ selected_week|add:'-1' }}"
+               class="week-nav-link">
+                &larr; Previous Week
+            </a>
+        {% endif %}
+
+        {% if selected_week != current_week %}
+            <a href="?season={{ selected_season }}&week={{ current_week }}"
+               class="week-nav-link current-week-link">
+                This Week
+            </a>
+        {% endif %}
+
+        {% if selected_week < 18 %}
+            <a href="?season={{ selected_season }}&week={{ selected_week|add:'1' }}"
+               class="week-nav-link">
+                Next Week &rarr;
+            </a>
+        {% endif %}
     </div>
+</div>
 
-        <div class="picks-week-section">
-        <h2 class="picks-week-title">Week {{ selected_week }}</h2>
+<div class="games-container">
+    {% for game_info in game_data %}
+        <div class="game-card">
 
-        <div class="picks-week-nav">
-            {% if selected_week > 1 %}
-                <a href="?season={{ selected_season }}&week={{ selected_week|add:'-1' }}" class="week-nav-link">
-                    &larr; Previous Week
-                </a>
-            {% endif %}
-
-            {% if selected_week != current_week %}
-                <a href="?season={{ selected_season }}&week={{ current_week }}" class="week-nav-link current-week-link">
-                    This Week
-                </a>
-            {% endif %}
-
-            {% if selected_week < 18 %}
-                <a href="?season={{ selected_season }}&week={{ selected_week|add:'1' }}" class="week-nav-link">
-                    Next Week &rarr;
-                </a>
-            {% endif %}
-        </div>
-    </div>
-
-
-   <div class="games-container">
-        {% for game_info in game_data %}
-            <div class="game-card">
-
-                <div class="card-header">
-                    {% if game_info.kickoff_label == "FINAL" %}
-                        <span class="kickoff-text">GAME COMPLETE</span>
-                        <span class="status-badge final">FINAL</span>
-                    {% elif game_info.kickoff_label == "IN PROGRESS" %}
-                        <span class="kickoff-text">LIVE GAME</span>
-                        <span class="status-badge live">IN PROGRESS</span>
-                    {% else %}
-                        <span class="kickoff-text">
-                            {{ game_info.kickoff_label }}
-                        </span>
-                    {% endif %}
-                </div>
-
-                <div class="game-team">
-                    <span class="team-name">
-                        {{ game_info.game.away_team }}
+            <div class="card-header">
+                {% if game_info.kickoff_label == "FINAL" %}
+                    <span class="kickoff-text">GAME COMPLETE</span>
+                    <span class="status-badge final">FINAL</span>
+                {% elif game_info.kickoff_label == "IN PROGRESS" %}
+                    <span class="kickoff-text">LIVE GAME</span>
+                    <span class="status-badge live">IN PROGRESS</span>
+                {% else %}
+                    <span class="kickoff-text">
+                        {{ game_info.kickoff_label }}
                     </span>
-                    <span class="team-score {% if game_info.score and game_info.score.away_score > game_info.score.home_score %}winning-score{% endif %}">
-                        {% if game_info.score %}
-                            {{ game_info.score.away_score }}
-                        {% else %}
-                            —
-                        {% endif %}
-                    </span>
-                </div>
-
-                <div class="game-team">
-                    <span class="team-name">
-                        {{ game_info.game.home_team }}
-                    </span>
-                    <span class="team-score {% if game_info.score and game_info.score.home_score > game_info.score.away_score %}winning-score{% endif %}">
-                        {% if game_info.score %}
-                            {{ game_info.score.home_score }}
-                        {% else %}
-                            —
-                        {% endif %}
-                    </span>
-                </div>
-
-                <div class="game-pick">
-                    {% if game_info.pick_team %}
-                        <div class="your-pick">
-                            <span>Your Pick</span>
-                            <strong>{{ game_info.pick_team }}</strong>
-                        </div>
-                    {% endif %}
-
-                    {% if game_info.pick_available %}
-                        <form method="post"
-                              action="{% url 'make_pick' game_info.game.game_id %}">
-                            {% csrf_token %}
-
-                            <div class="pick-buttons">
-                                <button type="button"
-                                        id="away-btn-{{ game_info.game.game_id }}"
-                                        class="pick-button {% if game_info.pick_status == 'away' %}selected{% endif %}"
-                                        data-team="away">
-                                    Pick {{ game_info.game.away_team }}
-                                </button>
-
-                                <button type="button"
-                                        id="home-btn-{{ game_info.game.game_id }}"
-                                        class="pick-button {% if game_info.pick_status == 'home' %}selected{% endif %}"
-                                        data-team="home">
-                                    Pick {{ game_info.game.home_team }}
-                                </button>
-                            </div>
-
-                            <input type="hidden"
-                                   name="team_picked"
-                                   id="team-picked-{{ game_info.game.game_id }}"
-                                   value="{{ game_info.pick_status }}">
-                        </form>
-                    {% elif not game_info.pick_team %}
-                        <div class="pick-locked">
-                            Picks unavailable (game started)
-                        </div>
-                    {% endif %}
-                </div>
-
+                {% endif %}
             </div>
-        {% empty %}
-            <p>No games available for this week.</p>
-        {% endfor %}
-    </div>
-    <script>
-        document.addEventListener("DOMContentLoaded", function() {
-            const pickButtons = document.querySelectorAll('.pick-button');
 
-            if (sessionStorage.getItem('scrollPosition')) {
-                window.scrollTo(0, sessionStorage.getItem('scrollPosition'));
-                sessionStorage.removeItem('scrollPosition');  // Clear it after restoring
-            }
+            {% if game_info.pick_available %}
+                <form method="post"
+                      action="{% url 'make_pick' game_info.game.game_id %}"
+                      class="team-pick-form">
+                    {% csrf_token %}
 
-            pickButtons.forEach(button => {
-                button.addEventListener('click', function() {
-                    const gameId = this.id.split('-')[2];
-                    const homeButton = document.getElementById(`home-btn-${gameId}`);
-                    const awayButton = document.getElementById(`away-btn-${gameId}`);
+                    <div class="game-team">
+                        <button type="button"
+                                class="team-choice {% if game_info.pick_status == 'away' %}selected{% endif %}"
+                                data-team="away"
+                                data-team-name="{{ game_info.game.away_team|escape }}"
+                                aria-pressed="{% if game_info.pick_status == 'away' %}true{% else %}false{% endif %}">
 
-                    homeButton.classList.remove('selected');
-                    awayButton.classList.remove('selected');
+                            <span class="team-abbr">
+                                {{ game_info.game.away_team }}
+                            </span>
 
-                    // Add 'selected' class to the clicked button
-                    this.classList.add('selected');
+                            <span class="team-name">
+                                {{ game_info.game.away_team }}
+                            </span>
 
-                    // Update the hidden input with the selected team
-                    document.getElementById(`team-picked-${gameId}`).value = this.dataset.team;
+                            <span class="team-score {% if game_info.score and game_info.score.away_score > game_info.score.home_score %}winning-score{% endif %}">
+                                {% if game_info.score %}
+                                    {{ game_info.score.away_score }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </span>
+                        </button>
+                    </div>
 
-                    sessionStorage.setItem('scrollPosition', window.scrollY);
+                    <div class="game-team">
+                        <button type="button"
+                                class="team-choice {% if game_info.pick_status == 'home' %}selected{% endif %}"
+                                data-team="home"
+                                data-team-name="{{ game_info.game.home_team|escape }}"
+                                aria-pressed="{% if game_info.pick_status == 'home' %}true{% else %}false{% endif %}">
 
-                    // Delay form submission slightly to show the "blue" effect before the page reloads
-                    setTimeout(() => {
-                        this.closest('form').submit();
-                    }, 100); // Adjust the timeout duration if needed
-                });
+                            <span class="team-abbr">
+                                {{ game_info.game.home_team }}
+                            </span>
+
+                            <span class="team-name">
+                                {{ game_info.game.home_team }}
+                            </span>
+
+                            <span class="team-score {% if game_info.score and game_info.score.home_score > game_info.score.away_score %}winning-score{% endif %}">
+                                {% if game_info.score %}
+                                    {{ game_info.score.home_score }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </span>
+                        </button>
+                    </div>
+
+                    <input type="hidden"
+                           name="team_picked"
+                           value="{{ game_info.pick_status|default:'' }}">
+                </form>
+
+            {% else %}
+                <div class="game-team">
+                    <div class="team-choice {% if game_info.pick_status == 'away' %}selected{% endif %}"
+                         data-team-name="{{ game_info.game.away_team|escape }}">
+                        <span class="team-abbr">{{ game_info.game.away_team }}</span>
+                        <span class="team-record">
+                            {% if game_info.away_record %}
+                                {{ game_info.away_record.wins }}-{{ game_info.away_record.losses }}-{{ game_info.away_record.ties }}
+                            {% endif %}
+                        </span>
+                        <span class="team-score {% if game_info.score and game_info.score.away_score > game_info.score.home_score %}winning-score{% endif %}">
+                            {% if game_info.score %}{{ game_info.score.away_score }}{% else %}—{% endif %}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="game-team">
+                    <div class="team-choice {% if game_info.pick_status == 'home' %}selected{% endif %}"
+                         data-team-name="{{ game_info.game.home_team|escape }}">
+                        <span class="team-abbr">{{ game_info.game.home_team }}</span>
+                        <span class="team-record">
+                            {% if game_info.home_record %}
+                                {{ game_info.home_record.wins }}-{{ game_info.home_record.losses }}-{{ game_info.home_record.ties }}
+                            {% endif %}
+                        </span>
+                        <span class="team-score {% if game_info.score and game_info.score.home_score > game_info.score.away_score %}winning-score{% endif %}">
+                            {% if game_info.score %}{{ game_info.score.home_score }}{% else %}—{% endif %}
+                        </span>
+                    </div>
+                </div>
+            {% endif %}
+
+            <div class="game-pick">
+                {% if game_info.pick_team %}
+                    <div class="your-pick">
+                        <span>Your Pick</span>
+                        <strong>{{ game_info.pick_team }}</strong>
+                    </div>
+                {% elif not game_info.pick_available %}
+                    <div class="pick-locked">
+                        Picks unavailable (game started)
+                    </div>
+                {% endif %}
+            </div>
+
+        </div>
+    {% empty %}
+        <p>No games available for this week.</p>
+    {% endfor %}
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    // Restore scroll position after a pick is saved.
+    const savedPosition = sessionStorage.getItem("scrollPosition");
+
+    if (savedPosition !== null) {
+        window.scrollTo(0, Number(savedPosition));
+        sessionStorage.removeItem("scrollPosition");
+    }
+
+    // NFL team colors: primary color and light background tint.
+    const teamColors = {
+        ARI: ["#97233F", "#FCE8ED"],
+        ATL: ["#A71930", "#FBE7EB"],
+        BAL: ["#241773", "#EDE9FC"],
+        BUF: ["#00338D", "#E6EEFF"],
+        CAR: ["#0085CA", "#E2F5FC"],
+        CHI: ["#0B162A", "#E5EAF2"],
+        CIN: ["#FB4F14", "#FFF0E8"],
+        CLE: ["#311D00", "#F5EBDD"],
+        DAL: ["#003594", "#E8EEFF"],
+        DEN: ["#FB4F14", "#FFF0E8"],
+        DET: ["#0076B6", "#E4F4FC"],
+        GB:  ["#203731", "#E4F1EB"],
+        HOU: ["#03202F", "#E4EDF2"],
+        IND: ["#002C5F", "#E5EDFA"],
+        JAX: ["#006778", "#E1F5F6"],
+        KC:  ["#E31837", "#FCE7EB"],
+        LAC: ["#0080C6", "#E4F5FC"],
+        LAR: ["#003594", "#E8EEFF"],
+        LV:  ["#555555", "#EEEEEE"],
+        MIA: ["#008E97", "#E2F7F6"],
+        MIN: ["#4F2683", "#F0E8FC"],
+        NE:  ["#002244", "#E5ECF5"],
+        NO:  ["#9F8958", "#F6F0E3"],
+        NYG: ["#0B2265", "#E7ECFC"],
+        NYJ: ["#125740", "#E5F4EB"],
+        PHI: ["#004C54", "#E3F4F4"],
+        PIT: ["#FFB612", "#FFF5D8"],
+        SF:  ["#AA0000", "#FBE7E7"],
+        SEA: ["#002244", "#E5ECF5"],
+        TB:  ["#D50A0A", "#FDE8E8"],
+        TEN: ["#0C2340", "#E7EDF7"],
+        WAS: ["#5A1414", "#F7E9E9"]
+    };
+
+    // Map full team names to their abbreviations.
+    const aliases = {
+        "ARIZONA CARDINALS": "ARI",
+        "ATLANTA FALCONS": "ATL",
+        "BALTIMORE RAVENS": "BAL",
+        "BUFFALO BILLS": "BUF",
+        "CAROLINA PANTHERS": "CAR",
+        "CHICAGO BEARS": "CHI",
+        "CINCINNATI BENGALS": "CIN",
+        "CLEVELAND BROWNS": "CLE",
+        "DALLAS COWBOYS": "DAL",
+        "DENVER BRONCOS": "DEN",
+        "DETROIT LIONS": "DET",
+        "GREEN BAY PACKERS": "GB",
+        "HOUSTON TEXANS": "HOU",
+        "INDIANAPOLIS COLTS": "IND",
+        "JACKSONVILLE JAGUARS": "JAX",
+        "KANSAS CITY CHIEFS": "KC",
+        "LOS ANGELES CHARGERS": "LAC",
+        "LOS ANGELES RAMS": "LAR",
+        "LAS VEGAS RAIDERS": "LV",
+        "MIAMI DOLPHINS": "MIA",
+        "MINNESOTA VIKINGS": "MIN",
+        "NEW ENGLAND PATRIOTS": "NE",
+        "NEW ORLEANS SAINTS": "NO",
+        "NEW YORK GIANTS": "NYG",
+        "NEW YORK JETS": "NYJ",
+        "PHILADELPHIA EAGLES": "PHI",
+        "PITTSBURGH STEELERS": "PIT",
+        "SAN FRANCISCO 49ERS": "SF",
+        "SEATTLE SEAHAWKS": "SEA",
+        "TAMPA BAY BUCCANEERS": "TB",
+        "TENNESSEE TITANS": "TEN",
+        "WASHINGTON COMMANDERS": "WAS"
+    };
+
+    function getTeamCode(name) {
+        const normalized = name.trim().toUpperCase();
+        return aliases[normalized] || normalized;
+    }
+
+    // Apply team colors and abbreviations.
+    document.querySelectorAll(".team-choice[data-team-name]").forEach(function (row) {
+        const code = getTeamCode(row.dataset.teamName);
+        const colors = teamColors[code];
+
+        if (!colors) return;
+
+        row.style.setProperty("--team-color", colors[0]);
+        row.style.setProperty("--team-tint", colors[1]);
+
+        const badge = row.querySelector(".team-abbr");
+        if (badge) {
+            badge.textContent = code;
+        }
+    });
+
+    // Select a team and submit the existing Django pick form.
+    document.querySelectorAll(".team-choice[data-team]").forEach(function (button) {
+        button.addEventListener("click", function () {
+            const form = this.closest(".team-pick-form");
+            if (!form) return;
+
+            const hiddenInput = form.querySelector('input[name="team_picked"]');
+            if (!hiddenInput) return;
+
+            form.querySelectorAll(".team-choice[data-team]").forEach(function (team) {
+                team.classList.remove("selected");
+                team.setAttribute("aria-pressed", "false");
             });
+
+            this.classList.add("selected");
+            this.setAttribute("aria-pressed", "true");
+            hiddenInput.value = this.dataset.team;
+
+            sessionStorage.setItem("scrollPosition", window.scrollY);
+
+            form.requestSubmit();
         });
-    </script>
+    });
+
+});
+</script>
+
 {% endblock %}

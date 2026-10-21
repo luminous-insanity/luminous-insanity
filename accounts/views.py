@@ -10,9 +10,10 @@ from django.views.decorators.http import require_POST
 from datetime import timedelta
 from django.utils import timezone
 from api.models import Game
-from api.services import MAX_WEEK, current_week
+from api.services import MAX_WEEK, current_week, get_team_records
 from .forms import LoginForm, SignUpForm
 from .models import Pick
+import logging
 from .standings import standing_for
 
 
@@ -21,7 +22,7 @@ def signup_view(request):
         form = SignUpForm(request.POST)
         if form.is_valid():
             user = form.save()
-            login(request, user)  # Log in the user after successful registration
+            login(request, user, backend='django.contrib.auth.backends.ModelBackend')  # Log in the user after successful registration
             messages.success(request, 'Registration successful. Welcome!')
             return redirect('dashboard')
     else:
@@ -133,6 +134,12 @@ def dashboard(request):
 def picks(request, week_number=None):
     current = current_week()
     selected_season, seasons = _selected_season(request)
+    try:
+        team_records = get_team_records()
+    except Exception:
+        # Records are cosmetic. Never let an API problem break the picks page.
+        logging.getLogger(__name__).exception("Could not load team records")
+        team_records = {}
     selected_week = week_number or _selected_week(request, current)
 
     games = (
@@ -161,6 +168,8 @@ def picks(request, week_number=None):
             'pick_status': picks_by_game.get(game.pk, 'Not Picked'),
             'pick_team': _team_name(game, picks_by_game.get(game.pk)),
             'pick_available': not game.has_started,
+            'home_record': team_records.get(game.home_team),
+            'away_record': team_records.get(game.away_team),
         })
 
     context = {

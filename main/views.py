@@ -1,7 +1,10 @@
 # main/views.py
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import render
+import logging
+
+from django.core.mail import EmailMessage
+
 
 from accounts.models import Pick
 from accounts.views import _selected_season
@@ -9,6 +12,9 @@ from accounts.standings import compute_standings
 from api.models import Game
 from api.rules import grade_pick
 from api.services import current_week
+from django.contrib import messages
+from django.core.mail import send_mail
+from django.shortcuts import render, redirect
 
 
 def home(request):
@@ -103,7 +109,55 @@ def about(request):
 
 
 def contact(request):
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        email = request.POST.get('email', '').strip()
+        subject = request.POST.get('subject', '').strip()
+        message = request.POST.get('message', '').strip()
+
+        if not all([name, email, subject, message]):
+            messages.error(request, 'Please complete all fields.')
+            return render(request, 'main/contact.html', {'form_data': request.POST})
+
+        if len(name) > 100 or len(email) > 254 or len(subject) > 150 or len(message) > 5000:
+            messages.error(request, 'One or more fields exceed the allowed length.')
+            return render(request, 'main/contact.html', {'form_data': request.POST})
+
+        email_subject = f'GameDayPicks Contact: {subject}'
+        email_body = (
+            f'From: {name}\n'
+            f'Reply email: {email}\n\n'
+            f'Message:\n{message}'
+        )
+
+        try:
+
+            email_message = EmailMessage(
+                subject=email_subject,
+                body=email_body,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[settings.CONTACT_EMAIL],
+                reply_to=[email],
+            )
+            email_message.send(fail_silently=False)
+
+        except Exception:
+
+            logging.exception("Contact form email failed")
+
+            messages.error(
+                request,
+                'Sorry, your message could not be sent. Please try again later.'
+            )
+        else:
+            messages.success(
+                request,
+                'Your message has been sent successfully!'
+            )
+            return redirect('contact')
+
     return render(request, 'main/contact.html')
+
 
 
 def privacy(request):

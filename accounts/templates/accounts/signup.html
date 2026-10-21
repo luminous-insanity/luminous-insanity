@@ -1,12 +1,35 @@
-<!-- accounts/templates/accounts/signup.html -->
-{% extends 'main/base.html' %}
+ {% extends 'main/base.html' %}
+{% load socialaccount %}
 
 {% block content %}
-  <h2>Sign Up</h2>
-  <form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit">Sign Up</button>
-  </form>
-  <p>Already have an account? <a href="{% url 'login' %}">Log in here</a>.</p>
+<div class="auth-container">
+
+    <h2>Create Your Account</h2>
+    <p>Join GameDayPicks and get in the game.</p>
+
+    <a href="{% provider_login_url 'google' %}"
+       class="google-login-btn">
+        <span class="google-icon">G</span>
+        Continue with Google
+    </a>
+
+    <div class="auth-divider">
+        <span>OR</span>
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+
+        <button type="submit" class="auth-submit-btn">
+            Create Account
+        </button>
+    </form>
+
+    <p class="auth-signup-link">
+        Already have an account?
+        <a href="{% url 'login' %}">Log in here</a>
+    </p>
+
+</div>
 {% endblock %}

@@ -1443,7 +1443,7 @@
             text-align: left;
         }
 
-        /* ===== Header ===== */
+        /* ===== Game-card Header ===== */
 
         .game-card .card-header {
             display: flex;
@@ -1482,31 +1482,98 @@
             color: #b91c1c;
         }
 
-        /* ===== Teams and scores ===== */
+        /* ===== Teams, scores, and clickable picks ===== */
 
         .game-team {
             display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
+            align-items: stretch;
             min-width: 0;
-            padding: 15px 16px;
+            padding: 5px 12px;
             background: #ffffff;
             border-bottom: 1px solid #edf0f3;
         }
 
+        /* Clickable team row */
+        .team-choice {
+            --team-color: #444444;
+
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            min-width: 0;
+            min-height: 64px;
+            box-sizing: border-box;
+            padding: 9px 10px;
+            border: 2px solid transparent;
+            border-radius: 10px;
+            background: #ffffff;
+            color: #1f2937;
+            font: inherit;
+            text-align: left;
+            cursor: pointer;
+            overflow: hidden;
+            isolation: isolate;
+            -webkit-tap-highlight-color: transparent;
+            transition:
+                transform 0.16s ease,
+                box-shadow 0.16s ease,
+                border-color 0.16s ease,
+                background-color 0.16s ease,
+                color 0.16s ease;
+        }
+
+        /* Team-color block filling the left quarter */
+        .team-choice::before {
+            content: "";
+            position: absolute;
+            z-index: -1;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            width: 25%;
+            background: var(--team-color);
+            pointer-events: none;
+        }
+
+        /* Team abbreviation — pure white */
+        .team-abbr {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            min-width: 58px;
+            padding: 0;
+            border: none;
+            border-radius: 0;
+            background: transparent;
+            color: #ffffff;
+            font-size: 22px;
+            font-weight: 900;
+            line-height: 1;
+        }
+
+        /* Team name */
         .team-name {
             min-width: 0;
-            color: #1f2937;
+            color: inherit;
             font-size: 15px;
-            font-weight: 600;
+            font-weight: 650;
             overflow-wrap: anywhere;
         }
 
+        /* Team Record */
+        .team-record {
+            margin-left: 15px;
+        }
+
+        /* Score */
         .team-score {
             flex-shrink: 0;
             min-width: 28px;
-            color: #1f2937;
+            margin-left: auto;
+            color: inherit;
             font-size: 24px;
             font-weight: 800;
             text-align: right;
@@ -1514,6 +1581,92 @@
 
         .team-score.winning-score {
             color: #15803d;
+        }
+
+        /* Hover: highlight the entire row in the team color */
+        .team-choice:hover {
+            background: var(--team-color);
+            border-color: var(--team-color);
+            color: #ffffff;
+        }
+
+        .team-choice:hover .team-abbr,
+        .team-choice:hover .team-name,
+        .team-choice:hover .team-score {
+            color: #ffffff;
+        }
+
+        /* Selected: raised tile with a neutral gradient shadow */
+        .team-choice.selected {
+            z-index: 1;
+            transform: translateY(-3px);
+            border-color: #d1d5db;
+            background: linear-gradient(
+                180deg,
+                #ffffff 0%,
+                #f1f3f5 100%
+            );
+            color: #1f2937;
+            box-shadow:
+                0 3px 2px rgba(0, 0, 0, 0.12),
+                0 7px 12px rgba(0, 0, 0, 0.20);
+        }
+
+        /* Keep abbreviation white on the selected row */
+        .team-choice.selected .team-abbr {
+            color: #ffffff;
+        }
+
+        .team-choice.selected .team-name {
+            color: #1f2937;
+        }
+
+        .team-choice.selected .team-score {
+            color: #1f2937;
+        }
+
+        .team-choice.selected .team-score.winning-score {
+            color: #15803d;
+        }
+
+        /* Keyboard focus */
+        .team-choice:focus-visible {
+            outline: 3px solid #3b82f6;
+            outline-offset: 2px;
+        }
+
+        /* Mobile sizing */
+        @media (max-width: 480px) {
+            .game-team {
+                padding: 4px 8px;
+            }
+
+            .team-choice {
+                gap: 9px;
+                min-height: 62px;
+                padding: 8px;
+            }
+
+            .team-abbr {
+                min-width: 56px;
+                font-size: 22px;
+            }
+
+            .team-name {
+                font-size: 14px;
+            }
+
+            .team-score {
+                min-width: 24px;
+                font-size: 22px;
+            }
+        }
+
+        /* Respect reduced-motion preferences */
+        @media (prefers-reduced-motion: reduce) {
+            .team-choice {
+                transition: none;
+            }
         }
 
         /* ===== Pick section ===== */
@@ -1872,3 +2025,514 @@
             }
         }
 
+        /* GameDayPicks - Login Page */
+
+        .auth-container {
+            max-width: 440px;
+            margin: 40px auto;
+            padding: 30px;
+            background: #ffffff;
+            border: 1px solid #d9e2ec;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(11, 18, 32, 0.12);
+            box-sizing: border-box;
+        }
+
+        .auth-container h2 {
+            margin: 0 0 8px;
+            color: #17416d;
+            text-align: center;
+            font-size: 28px;
+            font-weight: 800;
+        }
+
+        .auth-container > p {
+            color: #526174;
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .google-login-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            width: 100%;
+            min-height: 48px;
+            box-sizing: border-box;
+            background: #ffffff;
+            color: #202124;
+            border: 1px solid #dadce0;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: background 0.2s, box-shadow 0.2s;
+        }
+
+        .google-login-btn:hover {
+            background: #f8faff;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+        }
+
+        .google-icon {
+            font-size: 22px;
+            font-weight: 800;
+            color: #4285f4;
+        }
+
+        .auth-divider {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin: 24px 0;
+            color: #8492a6;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .auth-divider::before,
+        .auth-divider::after {
+            content: "";
+            flex: 1;
+            height: 1px;
+            background: #dce3eb;
+        }
+
+        .auth-container form p {
+            margin-bottom: 18px;
+        }
+
+        .auth-container form label {
+            display: block;
+            margin-bottom: 6px;
+            color: #26384a;
+            font-weight: 700;
+        }
+
+        .auth-container form input {
+            display: block;
+            width: 100%;
+            min-height: 44px;
+            padding: 10px 12px;
+            box-sizing: border-box;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            background: #ffffff;
+            color: #172b4d;
+            font-size: 16px;
+        }
+
+        .auth-container form input:focus {
+            outline: 2px solid #326da5;
+            outline-offset: 1px;
+            border-color: #326da5;
+        }
+
+        .auth-submit-btn {
+            display: block;
+            width: 100%;
+            min-height: 48px;
+            margin-top: 22px;
+            border: none;
+            border-radius: 6px;
+            background: linear-gradient(135deg, #326da5, #17416d);
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: filter 0.2s;
+        }
+
+        .auth-submit-btn:hover {
+            filter: brightness(1.12);
+        }
+
+        .auth-signup-link {
+            margin: 24px 0 0;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .auth-signup-link a {
+            color: #245a91;
+            font-weight: 800;
+            text-decoration: none;
+        }
+
+        .auth-signup-link a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 520px) {
+            .auth-container {
+                width: calc(100% - 24px);
+                margin: 24px auto;
+                padding: 22px 18px;
+            }
+
+            .auth-container h2 {
+                font-size: 25px;
+            }
+        }
+
+        /* CONTACT PAGE */
+
+        .contact-page {
+            max-width: 850px;
+            margin: 0 auto;
+            padding: 35px 20px 55px;
+        }
+
+        .contact-heading {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .contact-eyebrow {
+            color: #d62828;
+            font-size: 0.85rem;
+            font-weight: 800;
+            letter-spacing: 2px;
+            margin-bottom: 8px;
+        }
+
+        .contact-heading h2 {
+            font-size: clamp(1.7rem, 5vw, 2.5rem);
+            font-weight: 900;
+            margin: 0 0 15px;
+        }
+
+        .contact-heading > p:last-child {
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.7;
+        }
+
+        .contact-card {
+            background: #fff;
+            color: #202a35;
+            padding: 30px;
+            border-radius: 12px;
+            border-top: 5px solid #d62828;
+            box-shadow: 0 5px 22px rgba(0, 0, 0, 0.12);
+        }
+
+        .contact-card h3 {
+            margin: 0 0 10px;
+            font-size: 1.5rem;
+            font-weight: 800;
+        }
+
+        .contact-intro {
+            color: #596574;
+            line-height: 1.6;
+            margin-bottom: 25px;
+        }
+
+        .contact-form {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .contact-field {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+        }
+
+        .contact-field label {
+            font-weight: 700;
+            font-size: 0.95rem;
+        }
+
+        .contact-field input,
+        .contact-field textarea {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 12px 14px;
+            border: 1px solid #cbd2da;
+            border-radius: 6px;
+            background: #f8fafc;
+            color: #202a35;
+            font: inherit;
+        }
+
+        .contact-field input:focus,
+        .contact-field textarea:focus {
+            outline: 2px solid #326da5;
+            outline-offset: 1px;
+            border-color: #326da5;
+        }
+
+        .contact-field textarea {
+            resize: vertical;
+            min-height: 140px;
+        }
+
+        .contact-submit {
+            align-self: flex-start;
+            padding: 13px 25px;
+            background: #d62828;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: background 0.2s ease, transform 0.2s ease;
+        }
+
+        .contact-submit:hover {
+            background: #b71f1f;
+            transform: translateY(-1px);
+        }
+
+        .contact-message {
+            padding: 12px 15px;
+            margin: 0 0 20px;
+            border-radius: 6px;
+            background: #e8f5e9;
+            color: #205b2b;
+        }
+
+        @media (max-width: 600px) {
+            .contact-page {
+                padding: 25px 12px 35px;
+            }
+
+            .contact-card {
+                padding: 22px 16px;
+            }
+
+            .contact-submit {
+                width: 100%;
+            }
+        }
+
+        /* ==============================
+           TERMS OF SERVICE PAGE
+           ============================== */
+
+        .legal-page {
+            max-width: 950px;
+            margin: 35px auto 60px;
+            padding: 0 20px;
+            color: #222;
+        }
+
+        .legal-heading {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 30px 20px;
+            background: linear-gradient(120deg, #071426 0%, #102b4b 60%, #17416d 100%);
+            border-radius: 12px;
+            color: #fff;
+            box-shadow: 0 5px 14px rgba(0, 0, 0, 0.16);
+        }
+
+        .legal-heading p:first-child {
+            margin: 0 0 8px;
+            color: #e5edf6;
+            font-size: 0.85rem;
+            font-weight: 800;
+            letter-spacing: 3px;
+        }
+
+        .legal-heading h2 {
+            margin: 0 0 12px;
+            color: #fff;
+            font-size: clamp(1.7rem, 4vw, 2.5rem);
+            font-weight: 900;
+            letter-spacing: 1px;
+            line-height: 1.2;
+        }
+
+        .legal-heading p:last-child {
+            margin: 0;
+            color: #e5edf6;
+            font-size: 0.9rem;
+        }
+
+        .legal-content {
+            padding: 35px 40px;
+            background: #fff;
+            border: 1px solid #dce3eb;
+            border-radius: 12px;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.07);
+        }
+
+        .legal-content h3 {
+            margin: 30px 0 10px;
+            padding-left: 12px;
+            border-left: 4px solid #c62828;
+            color: #17416d;
+            font-size: 1.15rem;
+            font-weight: 800;
+            line-height: 1.4;
+        }
+
+        .legal-content h3:first-child {
+            margin-top: 0;
+        }
+
+        .legal-content p {
+            margin: 0 0 16px;
+            color: #444;
+            font-size: 0.98rem;
+            line-height: 1.8;
+        }
+
+        .legal-content p:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Mobile layout */
+        @media (max-width: 600px) {
+            .legal-page {
+                margin: 20px auto 35px;
+                padding: 0 12px;
+            }
+
+            .legal-heading {
+                margin-bottom: 18px;
+                padding: 25px 15px;
+                border-radius: 9px;
+            }
+
+            .legal-heading p:first-child {
+                font-size: 0.75rem;
+                letter-spacing: 2px;
+            }
+
+            .legal-content {
+                padding: 24px 18px;
+                border-radius: 9px;
+            }
+
+            .legal-content h3 {
+                margin-top: 25px;
+                font-size: 1.05rem;
+            }
+
+            .legal-content p {
+                font-size: 0.94rem;
+                line-height: 1.75;
+            }
+        }
+
+        /* ABOUT GAMEDAYPICKS PAGE */
+
+        .about-page {
+            max-width: 950px;
+            margin: 35px auto 60px;
+            padding: 0 20px;
+            color: #222;
+        }
+
+        .about-heading {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 35px 25px;
+            background: linear-gradient(120deg, #071426 0%, #102b4b 60%, #17416d 100%);
+            border-radius: 12px;
+            color: #fff;
+            box-shadow: 0 5px 14px rgba(0, 0, 0, 0.16);
+        }
+
+        .about-heading p:first-child {
+            margin: 0 0 12px;
+            color: #e5edf6;
+            font-size: 0.82rem;
+            font-weight: 800;
+            letter-spacing: 2px;
+            line-height: 1.6;
+        }
+
+        .about-heading h2 {
+            margin: 0 0 14px;
+            color: #fff;
+            font-size: clamp(1.7rem, 4vw, 2.5rem);
+            font-weight: 900;
+            letter-spacing: 1px;
+            line-height: 1.2;
+        }
+
+        .about-heading p:last-child {
+            max-width: 650px;
+            margin: 0 auto;
+            color: #e5edf6;
+            font-size: 1rem;
+            line-height: 1.7;
+        }
+
+        .about-content {
+            padding: 35px 40px;
+            background: #fff;
+            border: 1px solid #dce3eb;
+            border-radius: 12px;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.07);
+        }
+
+        .about-content h3 {
+            margin: 30px 0 10px;
+            padding-left: 12px;
+            border-left: 4px solid #c62828;
+            color: #17416d;
+            font-size: 1.2rem;
+            font-weight: 800;
+            line-height: 1.4;
+        }
+
+        .about-content h3:first-child {
+            margin-top: 0;
+        }
+
+        .about-content p {
+            margin: 0 0 16px;
+            color: #444;
+            font-size: 0.98rem;
+            line-height: 1.8;
+        }
+
+        .about-content p:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Mobile layout */
+        @media (max-width: 600px) {
+            .about-page {
+                margin: 20px auto 35px;
+                padding: 0 12px;
+            }
+
+            .about-heading {
+                margin-bottom: 18px;
+                padding: 27px 17px;
+                border-radius: 9px;
+            }
+
+            .about-heading p:first-child {
+                font-size: 0.72rem;
+                letter-spacing: 1.5px;
+            }
+
+            .about-heading p:last-child {
+                font-size: 0.94rem;
+            }
+
+            .about-content {
+                padding: 24px 18px;
+                border-radius: 9px;
+            }
+
+            .about-content h3 {
+                margin-top: 25px;
+                font-size: 1.1rem;
+            }
+
+            .about-content p {
+                font-size: 0.94rem;
+                line-height: 1.75;
+            }
+        }

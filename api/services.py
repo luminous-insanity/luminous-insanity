@@ -24,6 +24,7 @@ from django.utils import timezone
 
 from . import rules
 from .models import Game
+from django.core.cache import cache
 
 log = logging.getLogger(__name__)
 
@@ -56,6 +57,43 @@ def _get(endpoint, params):
     if body is None:
         raise ApiError(f"{endpoint} returned no 'body' (bad key, plan limit, or API change?)")
     return body
+
+
+def get_team_records():
+    """Fetch NFL team records and cache them for 24 hours."""
+
+    cache_key = "nfl_team_records"
+    cached_records = cache.get(cache_key)
+
+    if cached_records is not None:
+        return cached_records
+
+    teams = _get("getNFLTeams", {})
+
+    if not isinstance(teams, list):
+        raise ApiError("getNFLTeams returned an unexpected response.")
+
+    records = {}
+
+    for team in teams:
+        if not isinstance(team, dict):
+            continue
+
+        team_abbr = team.get("teamAbv")
+
+        if not team_abbr:
+            continue
+
+        records[team_abbr] = {
+            "wins": team.get("wins", 0),
+            "losses": team.get("loss", 0),
+            "ties": team.get("tie", 0),
+        }
+
+    if records:
+        cache.set(cache_key, records, 86400)
+
+    return records
 
 
 # ---------------------------------------------------------------- schedule --
