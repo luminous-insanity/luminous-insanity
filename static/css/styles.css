@@ -50,55 +50,6 @@
             margin-left: auto;
         }
 
-        /* Hamburger button */
-        .menu-toggle {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            gap: 6px;
-            width: 48px;
-            height: 44px;
-            padding: 9px;
-            background: #0033cc;
-            border: 2px solid white;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-
-        .menu-toggle:hover {
-            background: #0055ff;
-        }
-
-        .menu-toggle span {
-            display: block;
-            width: 100%;
-            height: 3px;
-            background: white;
-            border-radius: 2px;
-        }
-
-        /* Hidden navigation menu */
-        .site-nav {
-            display: none;
-            position: absolute;
-            top: calc(100% + 10px);
-            right: 0;
-            min-width: 190px;
-            flex-direction: column;
-            gap: 8px;
-            padding: 12px;
-            background: #071426;
-            border: 1px solid #17416d;
-            border-radius: 8px;
-            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
-            z-index: 1000;
-        }
-
-        /* Show menu when hamburger is clicked */
-        .site-nav.menu-open {
-            display: flex;
-        }
-
         /* Navigation links */
         .site-nav a {
             display: block;
@@ -113,8 +64,6 @@
             transition: background-color 0.3s ease;
         }
 
-
-        /* Same color for every hamburger menu button */
         .site-nav a,
         .site-nav a:visited {
             background-color: #ffffff;
@@ -1761,49 +1710,6 @@
             margin: 0;
         }
 
-        .game-card .pick-buttons {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 8px;
-            width: 100%;
-        }
-
-        .game-card .pick-button {
-            width: 100%;
-            min-width: 0;
-            box-sizing: border-box;
-            padding: 10px 6px;
-            border: 1px solid #cbd5e1;
-            border-radius: 7px;
-            background: #ffffff;
-            color: #334155;
-            font-size: 12px;
-            font-weight: 700;
-            overflow-wrap: anywhere;
-            cursor: pointer;
-            transition: background-color 0.2s, border-color 0.2s, color 0.2s;
-        }
-
-        .game-card .pick-button:hover:not([disabled]) {
-            background: #eff6ff;
-            border-color: #60a5fa;
-        }
-
-        .game-card .pick-button.selected {
-            background: #dbeafe;
-            color: #1d4ed8;
-            border-color: #3b82f6;
-        }
-
-        .game-card .pick-button.selected:hover:not([disabled]) {
-            background: #bfdbfe;
-        }
-
-        .game-card .pick-button[disabled] {
-            cursor: not-allowed;
-            opacity: 0.6;
-        }
-
         .pick-locked {
             padding-top: 4px;
             color: #64748b;
@@ -2040,10 +1946,6 @@
             .header-right nav a {
                 padding: 8px 12px;
                 font-size: 14px;
-            }
-
-            .logged-in-as {
-                text-align: center;
             }
         }
 

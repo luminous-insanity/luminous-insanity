@@ -11,9 +11,8 @@ from accounts.views import _selected_season
 from accounts.standings import compute_standings
 from api.models import Game
 from api.rules import grade_pick
-from api.services import current_week
+from api.services import current_week, MAX_WEEK
 from django.contrib import messages
-from django.core.mail import send_mail
 from django.shortcuts import render, redirect
 
 
@@ -36,28 +35,25 @@ def home(request):
 
 
 def leaderboard(request):
-    current = current_week()
     selected_season, seasons = _selected_season(request)
 
     selected_week = request.GET.get('week', 'season')
 
-    if selected_week == 'season':
-        user_stats = compute_standings(season=selected_season)
-    else:
+    if selected_week != 'season':
         try:
             selected_week = int(selected_week)
-            if not 1 <= selected_week <= 18:
+            if not 1 <= selected_week <= MAX_WEEK:
                 selected_week = 'season'
         except (TypeError, ValueError):
             selected_week = 'season'
 
-        if selected_week == 'season':
-            user_stats = compute_standings(season=selected_season)
-        else:
-            user_stats = compute_standings(
-                week=selected_week,
-                season=selected_season,
-            )
+    if selected_week == 'season':
+        user_stats = compute_standings(season=selected_season)
+    else:
+        user_stats = compute_standings(
+            week=selected_week,
+            season=selected_season,
+        )
 
     return render(
         request,
@@ -65,13 +61,11 @@ def leaderboard(request):
         {
             'user_stats': user_stats,
             'selected_week': selected_week,
-            'current_week': current,
-            'weeks': range(1, 19),
+            'weeks': range(1, MAX_WEEK + 1),
             'selected_season': selected_season,
             'seasons': seasons,
         }
     )
-
 
 
 @login_required
@@ -157,7 +151,6 @@ def contact(request):
             return redirect('contact')
 
     return render(request, 'main/contact.html')
-
 
 
 def privacy(request):

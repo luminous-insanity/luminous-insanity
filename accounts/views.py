@@ -96,7 +96,6 @@ def _selected_season(request):
 
 @login_required
 def dashboard(request):
-    current = current_week()
     selected_season, seasons = _selected_season(request)
 
     record_week = request.GET.get('record_week', 'season')
@@ -119,7 +118,6 @@ def dashboard(request):
         )
 
     context = {
-        'current_week': current,
         'user_stats': user_stats,
         'record_week': record_week,
         'weeks': range(1, MAX_WEEK + 1),

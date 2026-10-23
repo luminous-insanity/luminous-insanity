@@ -54,7 +54,6 @@ INSTALLED_APPS = [
     'main',
     'accounts',
     'api',
-    'django_apscheduler',
     'allauth',
     'allauth.account',
     'allauth.socialaccount',

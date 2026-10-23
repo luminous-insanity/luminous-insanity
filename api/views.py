@@ -5,18 +5,11 @@ import logging
 
 from django.conf import settings
 from django.http import HttpResponseForbidden, JsonResponse
-from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 
-from .models import Game
 from .services import run_sync
 
 log = logging.getLogger(__name__)
-
-
-def game_list(request):
-    games = Game.objects.all().order_by('week')
-    return render(request, 'game_list.html', {'games': games})
 
 
 @csrf_exempt
