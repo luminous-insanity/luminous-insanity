@@ -1,0 +1,86 @@
+{% extends 'main/base.html' %}
+
+{% block title %}Challenge | GameDayPicks{% endblock %}
+
+{% block content %}
+<section class="challenges-page">
+
+    <div class="challenges-heading">
+        <p class="section-eyebrow">YOU vs {{ other.username|upper }}</p>
+        <h2>{{ title|upper }}</h2>
+        <p>{{ subtitle }} · {{ challenge.season }} Season, Week {{ challenge.week }}</p>
+    </div>
+
+    {% if result.state == 'final' %}
+        <div class="challenge-result {% if i_am_winner %}is-win{% elif result.tie %}is-tie{% else %}is-loss{% endif %}" role="status">
+            {% if result.tie %}
+                <strong>It's a tie!</strong>
+            {% elif i_am_winner %}
+                <strong>🏆 You won!</strong>
+            {% else %}
+                <strong>{{ winner.username }} won this one.</strong>
+            {% endif %}
+        </div>
+    {% else %}
+        <div class="challenge-result is-open" role="status">
+            <strong>{{ state_label }}</strong>
+            {% if result.state == 'pending' and can_accept %}<span>{{ other.username }} challenged you.</span>{% endif %}
+        </div>
+    {% endif %}
+
+    {% if result.state == 'open' or result.state == 'final' %}
+        <div class="challenge-scores big">
+            <div><span>You</span><strong>{{ my_score }}</strong></div>
+            <div><span>{{ other.username }}</span><strong>{{ their_score }}</strong></div>
+        </div>
+    {% endif %}
+
+    <div class="challenge-actions">
+        {% if can_accept %}
+            <form method="post" action="{% url 'challenge_respond' challenge.id 'accept' %}">{% csrf_token %}
+                <button type="submit" class="challenge-btn challenge-btn-accept">Accept</button></form>
+            <form method="post" action="{% url 'challenge_respond' challenge.id 'decline' %}">{% csrf_token %}
+                <button type="submit" class="challenge-btn challenge-btn-decline">Decline</button></form>
+        {% endif %}
+        {% if can_cancel %}
+            <form method="post" action="{% url 'challenge_respond' challenge.id 'cancel' %}">{% csrf_token %}
+                <button type="submit" class="challenge-btn challenge-btn-decline">Cancel Challenge</button></form>
+        {% endif %}
+    </div>
+
+    <div class="cmp-list challenge-games">
+        {% for row in games %}
+            <article class="cmp-game{% if row.differs %} differs{% endif %}">
+                <header class="cmp-game-head">
+                    <strong>{{ row.game.away_team }} at {{ row.game.home_team }}</strong>
+                    <span>
+                        {% if row.game.is_final %}
+                            FINAL · {{ row.game.away_team }} {{ row.game.away_score }}, {{ row.game.home_team }} {{ row.game.home_score }}
+                        {% else %}
+                            {{ row.kickoff_label }}
+                        {% endif %}
+                    </span>
+                </header>
+                <div class="cmp-picks">
+                    <div class="cmp-pick">
+                        <span class="cmp-pick-who">You</span>
+                        <strong>{% if row.my_team %}{{ row.my_team }}{% else %}—{% endif %}</strong>
+                        <span class="cmp-result res-{{ row.my_state }}">{{ row.my_label }}</span>
+                    </div>
+                    <div class="cmp-pick">
+                        <span class="cmp-pick-who">{{ other.username }}</span>
+                        <strong>{% if row.their_team %}{{ row.their_team }}{% else %}—{% endif %}</strong>
+                        <span class="cmp-result res-{{ row.their_state }}">{{ row.their_label }}</span>
+                    </div>
+                </div>
+            </article>
+        {% empty %}
+            <p class="no-featured-games">No games to show yet.</p>
+        {% endfor %}
+    </div>
+
+    <div class="leaderboard-bottom-link">
+        <a href="{% url 'challenges' %}">← ALL CHALLENGES</a>
+    </div>
+</section>
+{% endblock %}

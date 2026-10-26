@@ -1,0 +1,89 @@
+{% extends 'main/base.html' %}
+
+{% block title %}Challenge {{ opponent.username }} | GameDayPicks{% endblock %}
+
+{% block content %}
+<section class="challenges-page">
+
+    <div class="challenges-heading">
+        <p class="section-eyebrow">HEAD-TO-HEAD</p>
+        <h2>CHALLENGE {{ opponent.username|upper }}</h2>
+        <p>{{ season }} Season. They'll need to accept before it counts.</p>
+    </div>
+
+    {% if error %}
+        <p class="challenge-error" role="alert">{{ error }}</p>
+    {% endif %}
+
+    {% if not open_weeks and not open_games %}
+        <div class="challenges-empty">
+            <p>There are no upcoming games to challenge on right now.</p>
+            <p>Check back when the next week's games are posted.</p>
+        </div>
+    {% else %}
+    <form method="post" class="challenge-form">
+        {% csrf_token %}
+
+        <fieldset class="challenge-choice">
+            <legend>What are you playing for?</legend>
+
+            {% if open_weeks %}
+            <label class="challenge-radio">
+                <input type="radio" name="scope" value="week" id="scopeWeek"
+                       {% if chosen.scope != 'game' %}checked{% endif %}>
+                <span><strong>The whole week</strong>
+                    <small>Best record for the week wins.</small></span>
+            </label>
+            <div class="challenge-field" id="weekField">
+                <label for="week">Which week?</label>
+                <select name="week" id="week">
+                    {% for w in open_weeks %}
+                        <option value="{{ w }}" {% if chosen.week == w|stringformat:"s" %}selected{% endif %}>Week {{ w }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+
+            {% if open_games %}
+            <label class="challenge-radio">
+                <input type="radio" name="scope" value="game" id="scopeGame"
+                       {% if chosen.scope == 'game' or not open_weeks %}checked{% endif %}>
+                <span><strong>One game</strong>
+                    <small>Whoever picks that game correctly wins.</small></span>
+            </label>
+            <div class="challenge-field" id="gameField">
+                <label for="game">Which game?</label>
+                <select name="game" id="game">
+                    {% for g in open_games %}
+                        <option value="{{ g.pk }}" {% if chosen.game == g.pk|stringformat:"s" %}selected{% endif %}>
+                            Week {{ g.week }}: {{ g.away_team }} at {{ g.home_team }} ({{ g.kickoff_label }})
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+        </fieldset>
+
+        <div class="challenge-actions">
+            <button type="submit" class="challenge-btn challenge-btn-accept">Send Challenge</button>
+            <a href="{% url 'challenges' %}" class="challenge-btn challenge-btn-view">Cancel</a>
+        </div>
+    </form>
+    {% endif %}
+</section>
+
+<script>
+(function () {
+    var week = document.getElementById('scopeWeek');
+    var game = document.getElementById('scopeGame');
+    var weekField = document.getElementById('weekField');
+    var gameField = document.getElementById('gameField');
+    function sync() {
+        if (weekField) { weekField.hidden = !(week && week.checked); }
+        if (gameField) { gameField.hidden = !(game && game.checked); }
+    }
+    [week, game].forEach(function (el) { if (el) { el.addEventListener('change', sync); } });
+    sync();
+})();
+</script>
+{% endblock %}

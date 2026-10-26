@@ -1,0 +1,58 @@
+{% extends 'main/base.html' %}
+
+{% block title %}Challenges | GameDayPicks{% endblock %}
+
+{% block content %}
+<section class="challenges-page">
+
+    <div class="challenges-heading">
+        <p class="section-eyebrow">HEAD-TO-HEAD</p>
+        <h2>CHALLENGES</h2>
+        <p>Dare a friend on one game or a whole week. Best picks win.</p>
+    </div>
+
+    <div class="challenges-summary">
+        <div><span>Challenges won</span><strong>{{ won }}</strong></div>
+        <div><span>Record (W–L–T)</span><strong>{{ record }}</strong></div>
+        <div><span>Battles fought</span><strong>{{ battles }}</strong></div>
+    </div>
+
+    {% if nothing_yet %}
+        <div class="challenges-empty">
+            <p>No challenges yet.</p>
+            <p>Tap a friend on your dashboard or a player on the leaderboard, then choose
+               <strong>Challenge to Head-to-Head</strong>.</p>
+            <a href="{% url 'dashboard' %}?friends=find" class="challenge-btn challenge-btn-accept">Find a Friend to Challenge</a>
+        </div>
+    {% endif %}
+
+    {% if incoming %}
+        <h3 class="challenges-group">Waiting for your answer <span class="friend-request-dot" aria-label="New"></span></h3>
+        {% for r in incoming %}{% include 'accounts/_challenge_card.html' %}{% endfor %}
+    {% endif %}
+
+    {% if active %}
+        <h3 class="challenges-group">In progress</h3>
+        {% for r in active %}{% include 'accounts/_challenge_card.html' %}{% endfor %}
+    {% endif %}
+
+    {% if outgoing %}
+        <h3 class="challenges-group">Waiting for a reply</h3>
+        {% for r in outgoing %}{% include 'accounts/_challenge_card.html' %}{% endfor %}
+    {% endif %}
+
+    {% if finished %}
+        <h3 class="challenges-group">Finished</h3>
+        {% for r in finished %}{% include 'accounts/_challenge_card.html' %}{% endfor %}
+    {% endif %}
+
+    {% if past %}
+        <h3 class="challenges-group">Declined, cancelled or expired</h3>
+        {% for r in past %}{% include 'accounts/_challenge_card.html' %}{% endfor %}
+    {% endif %}
+
+    <div class="leaderboard-bottom-link">
+        <a href="{% url 'dashboard' %}">← BACK TO DASHBOARD</a>
+    </div>
+</section>
+{% endblock %}

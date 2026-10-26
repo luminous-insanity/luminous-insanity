@@ -5,6 +5,7 @@ cffi==1.17.0
 charset-normalizer==3.3.2
 cryptography==43.0.0
 Django==5.0.2
+django-allauth[socialaccount]==65.20.1
 django-apscheduler==0.6.2
 djangorestframework==3.14.0
 idna==3.8

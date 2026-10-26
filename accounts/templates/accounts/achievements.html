@@ -1,0 +1,50 @@
+{% extends 'main/base.html' %}
+{% block title %}Achievements | GameDayPicks{% endblock %}
+{% block content %}
+<section class="achievements-page">
+    <header class="achievements-page-header">
+        <p class="achievement-eyebrow">EVERY PICK COUNTS</p>
+        <h1>🏆 Your Trophy Case</h1>
+        <p>Track your milestones, build streaks, and earn bragging rights.</p>
+        <div class="achievement-overall-progress">
+            <strong>{{ unlocked_count }} / {{ total_levels }} milestones unlocked</strong>
+            <div class="achievement-progress achievement-progress-large" role="progressbar" aria-label="Overall achievement progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ percent }}"><span style="width:{{ percent }}%"></span></div>
+        </div>
+    </header>
+
+    <div class="achievements-grid">
+        {% for achievement in cards %}
+            <article class="achievement-card {% if achievement.complete %}is-complete{% endif %}">
+                <div class="achievement-card-top">
+                    <span class="achievement-card-icon" aria-hidden="true">{% if achievement.complete %}🏆{% elif achievement.unlocked_count %}🥇{% else %}🔒{% endif %}</span>
+                    <div>
+                        <h2>{{ achievement.title }}</h2>
+                        <p>{{ achievement.description }}</p>
+                    </div>
+                </div>
+                <div class="achievement-card-current">
+                    <span>Current progress</span>
+                    <strong>{{ achievement.value }}</strong>
+                </div>
+                <div class="achievement-milestones">
+                    {% for milestone in achievement.milestones %}
+                        <div class="achievement-milestone {% if milestone.unlocked %}is-unlocked{% endif %}">
+                            <span class="milestone-medal" aria-hidden="true">{% if milestone.unlocked %}🏅{% else %}🔒{% endif %}</span>
+                            <div class="milestone-copy">
+                                <strong>{{ milestone.threshold }}</strong>
+                                {% if milestone.unlocked %}
+                                    <span>Unlocked{% if milestone.unlocked_at %} · {{ milestone.unlocked_at|date:"M j, Y" }}{% endif %}</span>
+                                {% else %}
+                                    <span>{{ milestone.progress }} / {{ milestone.threshold }}</span>
+                                {% endif %}
+                            </div>
+                            {% if milestone.unlocked %}<span class="milestone-status">✓</span>{% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            </article>
+        {% endfor %}
+    </div>
+    <div class="achievements-back-link"><a href="{% url 'dashboard' %}">← Back to Dashboard</a></div>
+</section>
+{% endblock %}

@@ -52,6 +52,10 @@
         </div>
     </div>
 
+    {% with stats_label=stats_season|stringformat:"s"|add:" SEASON & CAREER" %}
+        {% include 'main/_stats_card.html' %}
+    {% endwith %}
+
     <div class="profile-future">
         <div class="profile-future-icon">🏈</div>
         <div>

@@ -1,20 +1,26 @@
 # accounts/views.py
 
+from django.db.models import Q, Count
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login, logout
+from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
-from datetime import timedelta
 from django.utils import timezone
+from datetime import timedelta
 from api.models import Game
 from api.services import MAX_WEEK, current_week, get_team_records
 from .forms import LoginForm, SignUpForm
-from .models import Pick
-import logging
+from .models import Pick, FriendRequest, PerformanceReaction, Challenge, AchievementUnlock
+from . import challenges
+from .leaderboard import default_week
+from .playermenu import menu_data, stats_summary
 from .standings import standing_for
+from .achievements import achievement_summary
+import logging
 
 
 def signup_view(request):
@@ -83,15 +89,28 @@ def _available_seasons():
 def _selected_season(request):
     seasons = _available_seasons()
 
-    try:
-        season = int(request.GET.get('season', settings.NFL_SEASON))
-    except (TypeError, ValueError):
-        season = settings.NFL_SEASON
+    # Explicit season selections always win. Otherwise use the configured
+    # season while it is still underway; once finalized, default to the latest
+    # fully completed season rather than an empty/new offseason season.
+    requested = request.GET.get('season')
+    if requested is not None:
+        try:
+            season = int(requested)
+        except (TypeError, ValueError):
+            season = settings.NFL_SEASON
+        if season not in seasons:
+            season = settings.NFL_SEASON
+        return season, seasons
 
-    if season not in seasons:
-        season = settings.NFL_SEASON
+    from .leaderboard import season_is_finalized
+    configured_season = settings.NFL_SEASON
+    configured_has_games = Game.objects.filter(season=configured_season).exists()
+    if configured_has_games and not season_is_finalized(configured_season):
+        return configured_season, seasons
 
-    return season, seasons
+    completed = [year for year in seasons if season_is_finalized(year)]
+    return (max(completed) if completed else configured_season), seasons
+
 
 
 @login_required
@@ -117,15 +136,148 @@ def dashboard(request):
             season=selected_season,
         )
 
+    friend_query = request.GET.get('friend_search', '').strip()
+    friend_results = User.objects.none()
+
+    if friend_query:
+        friend_results = User.objects.filter(
+            username__icontains=friend_query
+        ).exclude(
+            pk=request.user.pk
+        ).order_by('username')[:20]
+
+    incoming_requests = FriendRequest.objects.filter(
+        receiver=request.user,
+        status=FriendRequest.PENDING,
+    ).select_related('sender').order_by('-created_at')
+
+    accepted_requests = FriendRequest.objects.filter(
+        status=FriendRequest.ACCEPTED,
+    ).filter(
+        Q(sender=request.user) | Q(receiver=request.user)
+    ).select_related('sender', 'receiver')
+
+    friends = [
+        friend_request.receiver
+        if friend_request.sender_id == request.user.id
+        else friend_request.sender
+        for friend_request in accepted_requests
+    ]
+
+    # Expanded stats, the Challenges card, and the friend-tap menu.
+    my_stats = stats_summary(request.user, selected_season)
+    menus = menu_data(
+        friends, request.user, selected_season,
+        compare_week=default_week(selected_season),
+    )
+    friend_rows = [{'user': f, 'menu': menus[f.id]} for f in friends]
+    for row in friend_rows:
+        row['reaction_url'] = reverse('react_to_performance', args=[row['user'].id])
+        row['reaction_counts'] = {
+            item['emoji']: item['total'] for item in PerformanceReaction.objects.filter(
+                player=row['user'], season=selected_season, week=default_week(selected_season)
+            ).values('emoji').annotate(total=Count('id'))
+        }
+        row['my_reaction'] = PerformanceReaction.objects.filter(
+            reactor=request.user, player=row['user'], season=selected_season,
+            week=default_week(selected_season)
+        ).first()
+        row['reaction_clap'] = row['reaction_counts'].get('👏', 0)
+        row['reaction_fire'] = row['reaction_counts'].get('🔥', 0)
+        row['reaction_crown'] = row['reaction_counts'].get('👑', 0)
+
+    # "Invite a Friend": a link to the sign-up page plus a ready-to-send message,
+    # for people who aren't on GameDayPicks yet.
+    site_url = getattr(settings, 'SITE_URL', '').rstrip('/')
+    signup_path = reverse('signup')
+    invite_url = (
+        f'{site_url}{signup_path}' if site_url
+        else request.build_absolute_uri(signup_path)
+    )
+    invite_text = (
+        f"{request.user.username} invited you to GameDayPicks! "
+        "Pick NFL winners every week and see who does best among friends. "
+        "Join here:"
+    )
+
+    # A compact, informational feed. Keep it separate from notifications:
+    # notifications are actions for the current user; this feed is recent competition activity.
+    activity_feed = []
+    friend_ids = [friend.id for friend in friends]
+    if friend_ids:
+        for unlock in AchievementUnlock.objects.filter(
+            user_id__in=friend_ids
+        ).select_related('user').order_by('-unlocked_at')[:8]:
+            activity_feed.append({
+                'at': unlock.unlocked_at,
+                'kind': 'achievement',
+                'icon': '🏆',
+                'message': f'{unlock.user.username} earned an achievement.',
+                'detail': f'Level {unlock.level}',
+                'url': reverse('achievements'),
+            })
+
+    recent_challenges = Challenge.objects.filter(
+        Q(challenger=request.user) | Q(opponent=request.user)
+    ).select_related('challenger', 'opponent').order_by('-created_at')[:8]
+    for challenge in recent_challenges:
+        other_player = challenge.opponent if challenge.challenger_id == request.user.id else challenge.challenger
+        if challenge.status == Challenge.PENDING:
+            message = f'{challenge.challenger.username} challenged {challenge.opponent.username}.'
+            icon = '⚔️'
+        elif challenge.status == Challenge.ACCEPTED:
+            message = f'{challenge.challenger.username} and {challenge.opponent.username} are competing.'
+            icon = '🏈'
+        elif challenge.status in (Challenge.DECLINED, Challenge.CANCELLED):
+            message = f'The challenge between {challenge.challenger.username} and {challenge.opponent.username} was {challenge.get_status_display().lower()}.'
+            icon = 'ℹ️'
+        else:
+            continue
+        activity_feed.append({
+            'at': challenge.responded_at or challenge.created_at,
+            'kind': 'challenge',
+            'icon': icon,
+            'message': message,
+            'detail': f'Season {challenge.season}, Week {challenge.week}',
+            'url': reverse('challenges'),
+        })
+
+    activity_feed.sort(key=lambda item: item['at'], reverse=True)
+    activity_feed = activity_feed[:10]
+
     context = {
+        'activity_feed': activity_feed,
+        'invite_url': invite_url,
+        'invite_text': invite_text,
+        'invite_message': f'{invite_text} {invite_url}',
         'user_stats': user_stats,
         'record_week': record_week,
         'weeks': range(1, MAX_WEEK + 1),
         'selected_season': selected_season,
         'seasons': seasons,
+        'friend_query': friend_query,
+        'friend_results': friend_results,
+        'incoming_requests': incoming_requests,
+        'notification_count': incoming_requests.count() + PerformanceReaction.objects.filter(player=request.user).count(),
+        'friends': friends,
+        'friend_rows': friend_rows,
+        'reaction_choices': PerformanceReaction.choices,
+        'reaction_week': default_week(selected_season),
+        'received_reactions': PerformanceReaction.objects.filter(
+            player=request.user
+        ).select_related('reactor').order_by('-created_at')[:15],
+        'my_stats': my_stats,
+        'pending_challenges': challenges.incoming_pending(request.user),
+        'achievement_summary': achievement_summary(request.user),
     }
 
     return render(request, 'accounts/dashboard.html', context)
+
+
+@login_required
+def achievements_page(request):
+    summary = achievement_summary(request.user)
+    return render(request, 'accounts/achievements.html', summary)
 
 
 @login_required
@@ -155,27 +307,54 @@ def picks(request, week_number=None):
         )
     }
 
+    # Aggregate every site's picks for each game. These percentages are based
+    # only on users who have actually submitted a pick for that game.
+    community_pick_counts = {}
+    for row in (
+        Pick.objects.filter(game__in=games)
+        .values('game_id', 'team_picked')
+        .annotate(total=Count('id'))
+    ):
+        community_pick_counts.setdefault(row['game_id'], {'home': 0, 'away': 0})[
+            row['team_picked']
+        ] = row['total']
+
     game_data = []
     for game in games:
         has_scores = game.is_final
+        counts = community_pick_counts.get(game.pk, {'home': 0, 'away': 0})
+        community_total = counts['home'] + counts['away']
+        away_percent = round(counts['away'] * 100 / community_total) if community_total else 0
+        home_percent = 100 - away_percent if community_total else 0
+        user_pick = picks_by_game.get(game.pk)
         game_data.append({
             'game': game,
             'kickoff_label': get_kickoff_label(game),
             'score': game if has_scores else None,
             'winner': game.winner_name or 'N/A',
-            'pick_status': picks_by_game.get(game.pk, 'Not Picked'),
-            'pick_team': _team_name(game, picks_by_game.get(game.pk)),
+            'pick_status': user_pick or 'Not Picked',
+            'pick_team': _team_name(game, user_pick),
             'pick_available': not game.has_started,
             'home_record': team_records.get(game.home_team),
             'away_record': team_records.get(game.away_team),
+            'community_pick_total': community_total,
+            'community_away_percent': away_percent,
+            'community_home_percent': home_percent,
+            'show_community_picks': bool(user_pick and community_total),
         })
 
+    picked_count = sum(1 for item in game_data if item['pick_status'] in (Pick.HOME, Pick.AWAY))
+    total_games = len(game_data)
     context = {
         'current_week': current,
         'selected_week': selected_week,
         'game_data': game_data,
         'selected_season': selected_season,
         'seasons': seasons,
+        'picked_count': picked_count,
+        'remaining_count': total_games - picked_count,
+        'total_games': total_games,
+        'pick_progress_percent': round((picked_count / total_games) * 100) if total_games else 0,
     }
 
     return render(request, 'accounts/picks.html', context)
@@ -248,3 +427,121 @@ def make_pick(request, game_id):
     verb = 'saved' if created else 'changed'
     messages.success(request, f'Pick {verb} for {game}: {team}.')
     return redirect(back)
+
+
+@login_required
+def friend_search(request):
+    query = request.GET.get('q', '').strip()
+    users = User.objects.none()
+
+    if query:
+        users = User.objects.filter(
+            username__icontains=query
+        ).exclude(
+            pk=request.user.pk
+        ).order_by('username')[:20]
+
+    return render(request, 'accounts/friend_search.html', {
+        'query': query,
+        'users': users,
+    })
+
+
+@login_required
+def send_friend_request(request, user_id):
+
+    if request.method != 'POST':
+        return redirect('dashboard')
+
+    recipient = get_object_or_404(User, pk=user_id)
+
+    if recipient == request.user:
+        messages.error(request, "You cannot send a friend request to yourself.")
+        return redirect('dashboard')
+
+    existing_request = FriendRequest.objects.filter(
+        sender=request.user,
+        receiver=recipient,
+    ).first()
+
+    if existing_request:
+        messages.info(request, "You've already sent this user a friend request.")
+        return redirect('dashboard')
+
+    reverse_request = FriendRequest.objects.filter(
+        sender=recipient,
+        receiver=request.user,
+        status=FriendRequest.PENDING,
+    ).first()
+
+    if reverse_request:
+        messages.info(
+            request,
+            "This user has already requested to be your friend. "
+            "You can respond to their request when we add request management."
+        )
+        return redirect('dashboard')
+
+    already_friends = FriendRequest.objects.filter(
+        sender=request.user,
+        receiver=recipient,
+        status=FriendRequest.ACCEPTED,
+    ).exists() or FriendRequest.objects.filter(
+        sender=recipient,
+        receiver=request.user,
+        status=FriendRequest.ACCEPTED,
+    ).exists()
+
+    if already_friends:
+        messages.info(request, "You're already friends with this user.")
+        return redirect('dashboard')
+
+    FriendRequest.objects.create(
+        sender=request.user,
+        receiver=recipient,
+        status=FriendRequest.PENDING,
+    )
+
+    messages.success(
+        request,
+        f"Friend request sent to {recipient.username}."
+    )
+    return redirect('dashboard')
+
+
+@login_required
+def respond_friend_request(request, request_id, action):
+    from django.contrib import messages
+    from django.shortcuts import get_object_or_404, redirect
+    from django.views.decorators.http import require_POST
+
+    if request.method != 'POST':
+        return redirect('dashboard')
+
+    friend_request = get_object_or_404(
+        FriendRequest,
+        pk=request_id,
+        receiver=request.user,
+        status=FriendRequest.PENDING,
+    )
+
+    if action == 'accept':
+        friend_request.status = FriendRequest.ACCEPTED
+        friend_request.save(update_fields=['status'])
+        messages.success(
+            request,
+            f"You and {friend_request.sender.username} are now friends."
+        )
+
+    elif action == 'decline':
+        sender_username = friend_request.sender.username
+        friend_request.delete()
+        messages.success(
+            request,
+            f"Friend request from {sender_username} declined."
+        )
+
+    else:
+        messages.error(request, "Invalid friend request action.")
+
+    return redirect(f"{reverse('dashboard')}?friends=requests")

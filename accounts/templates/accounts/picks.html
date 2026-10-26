@@ -46,6 +46,21 @@
     </div>
 </div>
 
+<section class="pick-progress-panel" aria-labelledby="pick-progress-title">
+    <div class="pick-progress-heading">
+        <div>
+            <h3 id="pick-progress-title">Your Week {{ selected_week }} Picks</h3>
+            <p><strong>{{ picked_count }}</strong> of {{ total_games }} complete
+                {% if remaining_count %}<span> · {{ remaining_count }} remaining</span>{% else %}<span> · All picks complete!</span>{% endif %}
+            </p>
+        </div>
+        <button type="button" class="review-picks-button" id="openPickReview" {% if not total_games %}disabled{% endif %}>Review Picks</button>
+    </div>
+    <div class="pick-progress-track" role="progressbar" aria-label="Weekly picks completed" aria-valuemin="0" aria-valuemax="{{ total_games }}" aria-valuenow="{{ picked_count }}">
+        <span style="width: {{ pick_progress_percent }}%"></span>
+    </div>
+</section>
+
 <div class="games-container">
     {% for game_info in game_data %}
         <div class="game-card">
@@ -174,14 +189,65 @@
                 {% endif %}
             </div>
 
+            {% if game_info.show_community_picks %}
+                <section class="community-picks"
+                         aria-label="Site-wide picks for {{ game_info.game.away_team }} versus {{ game_info.game.home_team }}"
+                         data-away-team="{{ game_info.game.away_team|escape }}"
+                         data-home-team="{{ game_info.game.home_team|escape }}"
+                         data-away-percent="{{ game_info.community_away_percent }}"
+                         data-home-percent="{{ game_info.community_home_percent }}">
+                    <div class="community-picks-heading">
+                        <strong>Site Picks</strong>
+                        <span>{{ game_info.community_pick_total }} pick{{ game_info.community_pick_total|pluralize }}</span>
+                    </div>
+                    <div class="community-picks-bar" role="img" aria-label="{{ game_info.game.away_team }} {{ game_info.community_away_percent }} percent, {{ game_info.game.home_team }} {{ game_info.community_home_percent }} percent">
+                        <span class="community-bar-away" style="width: {{ game_info.community_away_percent }}%"></span>
+                        <span class="community-bar-home" style="width: {{ game_info.community_home_percent }}%"></span>
+                    </div>
+                    <div class="community-picks-legend">
+                        <span class="community-away-label">{{ game_info.game.away_team }} <strong>{{ game_info.community_away_percent }}%</strong></span>
+                        <span class="community-home-label">{{ game_info.game.home_team }} <strong>{{ game_info.community_home_percent }}%</strong></span>
+                    </div>
+                </section>
+            {% endif %}
+
         </div>
     {% empty %}
         <p>No games available for this week.</p>
     {% endfor %}
 </div>
 
+<dialog class="pick-review-dialog" id="pickReviewDialog" aria-labelledby="pickReviewTitle">
+    <div class="pick-review-header">
+        <div><p class="review-eyebrow">FINAL CHECK</p><h2 id="pickReviewTitle">Week {{ selected_week }} Pick Review</h2></div>
+        <button type="button" class="review-close" id="closePickReview" aria-label="Close review">&times;</button>
+    </div>
+    <p class="review-count">{{ picked_count }} of {{ total_games }} picks complete · {{ remaining_count }} remaining</p>
+    <div class="pick-review-list">
+        {% for game_info in game_data %}
+            <div class="pick-review-row">
+                <div><strong>{{ game_info.game.away_team }} @ {{ game_info.game.home_team }}</strong><small>{{ game_info.kickoff_label }}</small></div>
+                <span class="review-pick {% if not game_info.pick_team %}review-missing{% endif %}">
+                    {% if game_info.pick_team %}{{ game_info.pick_team }}{% elif not game_info.pick_available %}Locked · no pick{% else %}Not picked{% endif %}
+                </span>
+            </div>
+        {% endfor %}
+    </div>
+    <div class="pick-review-footer"><span>{% if remaining_count %}You can still select any unlocked games on this page.{% else %}You're all set for this week.{% endif %}</span><button type="button" class="review-done-button" id="donePickReview">Back to Picks</button></div>
+</dialog>
+
 <script>
 document.addEventListener("DOMContentLoaded", function () {
+    const reviewDialog = document.getElementById("pickReviewDialog");
+    const openReview = document.getElementById("openPickReview");
+    const closeReview = document.getElementById("closePickReview");
+    const doneReview = document.getElementById("donePickReview");
+    if (reviewDialog && openReview) openReview.addEventListener("click", () => reviewDialog.showModal());
+    [closeReview, doneReview].forEach(button => {
+        if (button) button.addEventListener("click", () => reviewDialog.close());
+    });
+
+
 
     // Restore scroll position after a pick is saved.
     const savedPosition = sessionStorage.getItem("scrollPosition");
@@ -282,6 +348,16 @@ document.addEventListener("DOMContentLoaded", function () {
         if (badge) {
             badge.textContent = code;
         }
+    });
+
+    // Color the community split using each NFL team's primary color.
+    document.querySelectorAll(".community-picks[data-away-team][data-home-team]").forEach(function (section) {
+        const awayCode = getTeamCode(section.dataset.awayTeam);
+        const homeCode = getTeamCode(section.dataset.homeTeam);
+        const awayColors = teamColors[awayCode];
+        const homeColors = teamColors[homeCode];
+        if (awayColors) section.style.setProperty("--away-team-color", awayColors[0]);
+        if (homeColors) section.style.setProperty("--home-team-color", homeColors[0]);
     });
 
     // Select a team and submit the existing Django pick form.

@@ -102,3 +102,32 @@ Needs `NFL_API_KEY` and `SYNC_TOKEN` saved in `.env`.
 - [ ] An hour after the first game ends: the score and winner show, and the leaderboard moved
 - [ ] Check cron-job.org history: runs are 200 OK
 - [ ] After Monday night: the next week appears by Tuesday
+
+
+## Leaderboard upgrade: extra checks
+
+Run these after Stage 1 passes (`python manage.py migrate` first: it adds two small tables).
+
+    python manage.py test accounts.test_ranking main.test_leaderboard
+
+Then, in the browser at /leaderboard/:
+1. Weekly is the default tab and opens on the latest week with finished games. The arrows stop at the first and last week.
+2. Season tab: ranks, W-L-T and a winning percentage. A player with only pending picks shows no percentage.
+3. Tap a row on a phone: a bottom sheet appears. Swipe it down, tap outside, or press Close to dismiss it. On a computer it is a small popup.
+4. View Picks: your picks next to theirs. A friend's pick for a game that has not kicked off stays hidden.
+5. Friends filter with no friends shows "Add friends to start your own competition" and a Find Friends button.
+6. Switch tabs: each tab remembers its own All Players / Friends choice.
+
+
+## Dashboard stats, friend menu and head-to-head challenges: extra checks
+
+Run `python manage.py migrate` first (adds the Challenge table), then:
+
+    python manage.py test accounts.test_challenges accounts.test_invite
+
+Then, in the browser:
+1. Dashboard: "Your Stats" shows weeks won, seasons won, win %, career win %, challenges won and head-to-head record.
+2. Open the Friends drawer and tap a friend. The same menu as the leaderboard appears (View Profile, View Picks, Challenge to Head-to-Head).
+3. Challenge a friend to a whole week and to a single game. Log in as the friend and accept or decline it on the Challenges page.
+4. After the games are final, the challenge shows the winner and the dashboard "Challenges Won" goes up.
+5. Invite a Friend (in the drawer) offers text, email, WhatsApp, share and copy.

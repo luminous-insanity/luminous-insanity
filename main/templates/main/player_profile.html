@@ -1,0 +1,73 @@
+{% extends 'main/base.html' %}
+
+{% block title %}{{ player.username }} | GameDayPicks{% endblock %}
+
+{% block content %}
+<section class="profile-page">
+
+    <div class="profile-heading">
+        <p class="profile-eyebrow">GAMEDAYPICKS PLAYER</p>
+        <h2>{{ player.username|upper }}</h2>
+        <p>Member since {{ player.date_joined|date:"F Y" }}</p>
+    </div>
+
+    <div class="profile-overview">
+        <div class="profile-avatar">{{ player.username|first|upper }}</div>
+        <div class="profile-identity">
+            <h3>{{ player.username }}</h3>
+            <p>GameDayPicks Member</p>
+        </div>
+    </div>
+
+    {% with stats_label=selected_season|stringformat:"s"|add:" SEASON & CAREER" %}
+        {% include 'main/_stats_card.html' %}
+    {% endwith %}
+
+    <div class="profile-card">
+        <div class="profile-card-heading">
+            <div>
+                <p class="profile-card-eyebrow">WEEK {{ stats_week }}</p>
+                <h3>Latest Week</h3>
+            </div>
+            <span class="profile-card-icon">📅</span>
+        </div>
+        <div class="profile-detail">
+            <span>Week {{ stats_week }} record (W–L–T)</span>
+            <strong>{{ week_stats.wins }}–{{ week_stats.losses }}–{{ week_stats.ties }}</strong>
+        </div>
+    </div>
+
+    {% if versus %}
+        <div class="profile-card">
+            <div class="profile-card-heading">
+                <div>
+                    <p class="profile-card-eyebrow">HEAD-TO-HEAD</p>
+                    <h3>You vs {{ player.username }}</h3>
+                </div>
+                <span class="profile-card-icon">⚔</span>
+            </div>
+            <div class="profile-detail">
+                <span>Your record against them (W–L–T)</span>
+                <strong>{{ versus.won }}–{{ versus.lost }}–{{ versus.tied }}</strong>
+            </div>
+            <div class="profile-detail">
+                <span>Battles fought</span>
+                <strong>{{ versus.total }}</strong>
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="profile-actions">
+        {% if user.is_authenticated %}
+            <a href="{{ challenge_url }}" class="profile-primary-button">⚔ CHALLENGE →</a>
+            <a href="{{ compare_url }}" class="profile-secondary-button">VIEW PICKS</a>
+        {% else %}
+            <a href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}" class="profile-primary-button">LOG IN TO CHALLENGE →</a>
+        {% endif %}
+        <a href="{% url 'leaderboard' %}?season={{ selected_season }}" class="profile-secondary-button">
+            BACK TO LEADERBOARD
+        </a>
+    </div>
+
+</section>
+{% endblock %}

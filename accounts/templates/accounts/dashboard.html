@@ -1,65 +1,561 @@
 {% extends 'main/base.html' %}
+{% load static %}
 {% block content %}
-    <div class="profile-actions">
-        <a href="{% url 'profile' %}" class="profile-text-link">
-            My Profile <span aria-hidden="true">→</span>
-        </a>
-    </div>
-    <div class="user-stats">
-        <h1>Your Activity — {{ selected_season }} Season</h1>
+<style>
+.dashboard-activity-feed{margin:1rem 0;padding:1rem;border:1px solid var(--border-color, #d8dee8);border-radius:14px;background:var(--card-bg, #fff)}
+.dashboard-activity-feed h2{margin:0;font-size:1.15rem}.activity-feed-subtitle{margin:.25rem 0 .8rem;color:var(--muted-text, #687386);font-size:.9rem}
+.activity-feed-list{list-style:none;margin:0;padding:0}.activity-feed-item{display:flex;align-items:center;gap:.7rem;padding:.75rem 0;border-top:1px solid var(--border-color, #e5e7eb)}
+.activity-feed-icon{font-size:1.35rem;flex:0 0 auto}.activity-feed-copy{flex:1;min-width:0}.activity-feed-copy p{margin:0}.activity-feed-copy small{display:block;margin-top:.2rem;color:var(--muted-text, #687386)}
+.activity-feed-link{font-size:.9rem;font-weight:600;white-space:nowrap}.activity-feed-empty{margin:.75rem 0 0;color:var(--muted-text, #687386)}
+@media(max-width:480px){.dashboard-activity-feed{padding:.8rem}.activity-feed-item{gap:.5rem}}
+</style>
+<div class="dashboard-layout">
 
-        <div class="record-section">
-            <h3>Your Record</h3>
+    <div class="dashboard-main">
+        <div class="profile-actions">
+            <a href="{% url 'profile' %}" class="profile-text-link">
+                My Profile <span aria-hidden="true">→</span>
+            </a>
+        </div>
 
-            <form method="get" class="record-filter">
-                <label for="season">Season:</label>
-                <select name="season" id="season" onchange="this.form.submit()">
-                    {% for season in seasons %}
-                        <option value="{{ season }}"
-                            {% if selected_season == season %}selected{% endif %}>
-                            {{ season }} Season
+        <div class="user-stats">
+            <h1>Your Activity — {{ selected_season }} Season</h1>
+
+            <div class="record-section">
+                <h3>Your Record</h3>
+
+                <form method="get" class="record-filter">
+                    <label for="season">Season:</label>
+                    <select name="season" id="season" onchange="this.form.submit()">
+                        {% for season in seasons %}
+                            <option value="{{ season }}"
+                                {% if selected_season == season %}selected{% endif %}>
+                                {{ season }} Season
+                            </option>
+                        {% endfor %}
+                    </select>
+
+                    <label for="record_week">View record:</label>
+                    <select name="record_week" id="record_week" onchange="this.form.submit()">
+                        <option value="season"
+                            {% if record_week == 'season' %}selected{% endif %}>
+                            Season Overall
                         </option>
-                    {% endfor %}
-                </select>
+                        {% for week in weeks %}
+                            <option value="{{ week }}"
+                                {% if record_week == week|stringformat:"s" %}selected{% endif %}>
+                                Week {{ week }}
+                            </option>
+                        {% endfor %}
+                    </select>
 
-                <label for="record_week">View record:</label>
-                <select name="record_week" id="record_week" onchange="this.form.submit()">
-                    <option value="season"
-                        {% if record_week == 'season' %}selected{% endif %}>
-                        Season Overall
-                    </option>
-                    {% for week in weeks %}
-                        <option value="{{ week }}"
-                            {% if record_week == week|stringformat:"s" %}selected{% endif %}>
-                            Week {{ week }}
-                        </option>
-                    {% endfor %}
-                </select>
+                    <noscript>
+                        <button type="submit">Show Record</button>
+                    </noscript>
+                </form>
 
-                <noscript>
-                    <button type="submit">Show Record</button>
-                </noscript>
-            </form>
-
-            <div class="stats-container">
-                <div class="stats-item stats-wins">
-                    <span class="stats-label">Wins</span>
-                    <span class="stats-number">{{ user_stats.wins }}</span>
-                </div>
-                <div class="stats-item stats-losses">
-                    <span class="stats-label">Losses</span>
-                    <span class="stats-number">{{ user_stats.losses }}</span>
-                </div>
-                <div class="stats-item stats-ties">
-                    <span class="stats-label">Ties</span>
-                    <span class="stats-number">{{ user_stats.ties }}</span>
+                <div class="stats-container">
+                    <div class="stats-item stats-wins">
+                        <span class="stats-label">Wins</span>
+                        <span class="stats-number">{{ user_stats.wins }}</span>
+                    </div>
+                    <div class="stats-item stats-losses">
+                        <span class="stats-label">Losses</span>
+                        <span class="stats-number">{{ user_stats.losses }}</span>
+                    </div>
+                    <div class="stats-item stats-ties">
+                        <span class="stats-label">Ties</span>
+                        <span class="stats-number">{{ user_stats.ties }}</span>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <div class="activity-actions">
-            <a href="{% url 'picks' %}?season={{ selected_season }}" class="dashboard-primary-button">MAKE PICKS</a>
-            <a href="{% url 'leaderboard' %}?season={{ selected_season }}" class="dashboard-secondary-button">VIEW LEADERBOARD</a>
+            <div class="record-section stats-extended">
+                <h3>Your Stats</h3>
+                <div class="stats-grid">
+                    <div class="stats-tile">
+                        <span class="stats-label">Weeks Won</span>
+                        <span class="stats-number">{{ my_stats.weeks_won }}</span>
+                    </div>
+                    <div class="stats-tile">
+                        <span class="stats-label">Seasons Won</span>
+                        <span class="stats-number">{{ my_stats.seasons_won }}</span>
+                    </div>
+                    <div class="stats-tile">
+                        <span class="stats-label">{{ selected_season }} Win %</span>
+                        <span class="stats-number">{{ my_stats.season_pct }}</span>
+                    </div>
+                    <div class="stats-tile">
+                        <span class="stats-label">Career Win %</span>
+                        <span class="stats-number">{{ my_stats.career_pct }}</span>
+                    </div>
+                    <div class="stats-tile">
+                        <span class="stats-label">Challenges Won</span>
+                        <span class="stats-number">{{ my_stats.challenges_won }}</span>
+                    </div>
+                    <div class="stats-tile">
+                        <span class="stats-label">Head-to-Head</span>
+                        <span class="stats-number">{{ my_stats.challenge_record }}</span>
+                        <span class="stats-sub">{{ my_stats.battles }} battle{{ my_stats.battles|pluralize }}</span>
+                    </div>
+                </div>
+
+                <a href="{% url 'challenges' %}" class="dashboard-challenges-card">
+                    <span class="dashboard-challenges-title">
+                        ⚔ Head-to-Head Challenges
+                        {% if pending_challenges %}<span class="friend-request-dot" aria-hidden="true"></span>{% endif %}
+                    </span>
+                    <small>
+                        {% if pending_challenges %}
+                            {{ pending_challenges }} waiting for your answer
+                        {% else %}
+                            Tap a friend to challenge them to a game or a week
+                        {% endif %}
+                    </small>
+                </a>
+            </div>
+
+            <section class="achievement-showcase" aria-labelledby="achievement-showcase-title">
+                <div class="achievement-showcase-heading">
+                    <div>
+                        <p class="achievement-eyebrow">YOUR MILESTONES</p>
+                        <h3 id="achievement-showcase-title">🏆 Trophy Case</h3>
+                        <p>{{ achievement_summary.unlocked_count }} of {{ achievement_summary.total_levels }} milestones unlocked</p>
+                    </div>
+                    <a href="{% url 'achievements' %}">View all →</a>
+                </div>
+                <div class="achievement-preview-grid">
+                    {% for achievement in achievement_summary.cards %}
+                        {% if achievement.unlocked_count or forloop.counter <= 3 %}
+                            <div class="achievement-preview-card {% if achievement.complete %}is-complete{% endif %}">
+                                <span class="achievement-preview-icon" aria-hidden="true">{% if achievement.complete %}🏆{% elif achievement.unlocked_count %}🥇{% else %}🔒{% endif %}</span>
+                                <strong>{{ achievement.title }}</strong>
+                                <span>{{ achievement.unlocked_count }}/{{ achievement.total_levels }} levels</span>
+                                {% if achievement.next_threshold %}
+                                    <div class="achievement-progress" role="progressbar" aria-label="{{ achievement.title }} progress" aria-valuemin="0" aria-valuemax="{{ achievement.next_threshold }}" aria-valuenow="{{ achievement.next_progress }}">
+                                        <span style="width:{{ achievement.next_percent }}%"></span>
+                                    </div>
+                                {% else %}
+                                    <span class="achievement-complete-label">Complete</span>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </section>
+
+            <div class="activity-actions">
+                <a href="{% url 'picks' %}?season={{ selected_season }}" class="dashboard-primary-button">MAKE PICKS</a>
+                <a href="{% url 'leaderboard' %}?season={{ selected_season }}" class="dashboard-secondary-button">VIEW LEADERBOARD</a>
+            </div>
         </div>
     </div>
+
+
+    <section class="dashboard-notifications" aria-label="Notifications">
+        <details class="notification-dropdown" {% if incoming_requests or received_reactions %}data-has-notifications="1"{% endif %}>
+            <summary>
+                <span aria-hidden="true">🔔</span> Notifications
+                {% if incoming_requests or received_reactions %}<span class="notification-count">{{ notification_count }}</span>{% endif %}
+            </summary>
+            <div class="notification-dropdown-panel">
+                {% for reaction in received_reactions %}
+                    <p class="notification-message"><strong>{{ reaction.reactor.username }}</strong> reacted {{ reaction.emoji }} to your Week {{ reaction.week }} / {{ reaction.season }} season record.</p>
+                {% endfor %}
+                {% for friend_request in incoming_requests %}
+                    <p class="notification-message"><strong>{{ friend_request.sender.username }}</strong> sent you a friend request.
+                        <a href="#friendsPanelRequests" class="notification-action" data-open-friend-requests>View request</a>
+                    </p>
+                {% endfor %}
+                {% if not received_reactions and not incoming_requests %}<p class="notification-empty">You're all caught up.</p>{% endif %}
+            </div>
+        </details>
+    </section>
+
+    <section class="dashboard-activity-feed" aria-labelledby="activity-feed-title">
+        <h2 id="activity-feed-title">Recent Activity</h2>
+        <p class="activity-feed-subtitle">Achievements and competition updates.</p>
+        {% if activity_feed %}
+            <ul class="activity-feed-list">
+                {% for item in activity_feed %}
+                    <li class="activity-feed-item">
+                        <span class="activity-feed-icon" aria-hidden="true">{{ item.icon }}</span>
+                        <div class="activity-feed-copy">
+                            <p>{{ item.message }}</p>
+                            <small>{{ item.detail }} · {{ item.at|timesince }} ago</small>
+                        </div>
+                        <a href="{{ item.url }}" class="activity-feed-link" aria-label="View related activity">View</a>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="activity-feed-empty">Your competition activity will appear here as friends earn achievements and challenges progress.</p>
+        {% endif %}
+    </section>
+
+    <!-- Friends drawer toggle -->
+    <button
+        type="button"
+        class="friends-toggle"
+        id="friendsToggle"
+        aria-controls="friendsDrawer"
+        aria-expanded="false"
+    >
+        <span aria-hidden="true">👥</span>
+        Friends
+    </button>
+
+    <!-- Backdrop -->
+    <div class="friends-backdrop" id="friendsBackdrop"></div>
+
+    <!-- Slide-out friends drawer -->
+    <aside
+        class="friends-drawer"
+        id="friendsDrawer"
+        aria-label="Friends panel"
+        aria-hidden="true"
+    >
+        <div class="friends-drawer-header">
+            <h2>Friends</h2>
+            <button
+                type="button"
+                class="friends-close"
+                id="friendsClose"
+                aria-label="Close friends panel"
+            >&times;</button>
+        </div>
+
+        <form method="get" class="friend-search-form">
+            <input type="hidden" name="season" value="{{ selected_season }}">
+            <input type="hidden" name="record_week" value="{{ record_week }}">
+
+            <label for="friend_search">Find players</label>
+            <div class="friend-search-input-wrap">
+                <input
+                    type="search"
+                    id="friend_search"
+                    name="friend_search"
+                    value="{{ friend_query }}"
+                    placeholder="Search by username..."
+                    maxlength="150"
+                >
+                <button
+                    type="submit"
+                    class="friend-search-button"
+                    aria-label="Search players"
+                    title="Search players"
+                >⌕</button>
+            </div>
+        </form>
+
+        {% if friend_query %}
+            <div class="friend-search-results">
+                <h3>Search Results</h3>
+                {% for found_user in friend_results %}
+                    <div class="friend-list-item friend-search-result">
+                        <span>{{ found_user.username }}</span>
+
+                        <form method="post"
+                              action="{% url 'send_friend_request' found_user.id %}">
+                            {% csrf_token %}
+                            <button type="submit" class="add-friend-button">
+                                Add Friend
+                            </button>
+                        </form>
+                    </div>
+                {% empty %}
+
+                    <p>No users found matching "{{ friend_query }}".</p>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+
+        <!-- Invite someone who isn't on GameDayPicks yet -->
+        <section class="invite-box" aria-label="Invite a friend">
+            <button type="button" class="invite-button" id="inviteToggle"
+                    aria-expanded="false" aria-controls="invitePanel">
+                <span aria-hidden="true">✉</span> Invite a Friend
+            </button>
+            <p class="invite-hint">Not on GameDayPicks yet? Send them an invite.</p>
+
+            <div class="invite-panel" id="invitePanel" hidden
+                 data-url="{{ invite_url }}"
+                 data-text="{{ invite_text }}"
+                 data-message="{{ invite_message }}">
+                <button type="button" class="invite-option" id="inviteShare" hidden>
+                    <span aria-hidden="true">📤</span> Share…
+                </button>
+                <a class="invite-option"
+                   href="sms:?&amp;body={{ invite_message|urlencode:'' }}">
+                    <span aria-hidden="true">💬</span> Text Message
+                </a>
+                <a class="invite-option"
+                   href="mailto:?subject={{ 'Join me on GameDayPicks'|urlencode:'' }}&amp;body={{ invite_message|urlencode:'' }}">
+                    <span aria-hidden="true">📧</span> Email
+                </a>
+                <a class="invite-option" target="_blank" rel="noopener"
+                   href="https://wa.me/?text={{ invite_message|urlencode:'' }}">
+                    <span aria-hidden="true">🟢</span> WhatsApp
+                </a>
+                <button type="button" class="invite-option" id="inviteCopy">
+                    <span aria-hidden="true">🔗</span> Copy Invite
+                </button>
+                <p class="invite-status" id="inviteStatus" role="status" aria-live="polite"></p>
+            </div>
+        </section>
+
+        <div class="friends-tabs" role="tablist" aria-label="Friends navigation">
+            <button
+                type="button"
+                class="friends-tab is-active"
+                id="friendsTabFriends"
+                role="tab"
+                aria-selected="true"
+                aria-controls="friendsPanelFriends"
+            >
+                Friends
+            </button>
+
+            <button
+                type="button"
+                class="friends-tab"
+                id="friendsTabRequests"
+                role="tab"
+                aria-selected="false"
+                aria-controls="friendsPanelRequests"
+            >
+                Requests
+                {% if incoming_requests %}
+                    <span class="friend-request-dot" aria-label="Pending requests"></span>
+                {% endif %}
+            </button>
+        </div>
+
+        <div
+            class="friends-tab-panel is-active"
+            id="friendsPanelFriends"
+            role="tabpanel"
+            aria-labelledby="friendsTabFriends"
+        >
+            {% if friend_rows %}
+                <p class="friends-tap-hint">Tap a friend for their profile, picks or a challenge.</p>
+            {% endif %}
+            {% for row in friend_rows %}
+                <button type="button" class="friend-list-item friend-menu-button"
+                        aria-haspopup="dialog"
+                        {% include 'main/_menu_attrs.html' with m=row.menu %}
+                        data-reaction-url="{{ row.reaction_url }}" data-reaction-season="{{ selected_season }}" data-reaction-week="{{ reaction_week }}" data-reaction-allowed="1" data-reaction-current="{{ row.my_reaction.emoji|default:'' }}" data-reaction-clap="{{ row.reaction_clap|default:0 }}" data-reaction-fire="{{ row.reaction_fire|default:0 }}" data-reaction-crown="{{ row.reaction_crown|default:0 }}">
+                    <span>{{ row.user.username }}</span>
+                    <span class="friend-chevron" aria-hidden="true">›</span>
+                </button>
+
+            {% empty %}
+                <p class="friends-empty-message">
+                    You haven't added any friends yet.
+                </p>
+            {% endfor %}
+        </div>
+
+        <div
+            class="friends-tab-panel"
+            id="friendsPanelRequests"
+            role="tabpanel"
+            aria-labelledby="friendsTabRequests"
+            hidden
+        >
+
+                {% for friend_request in incoming_requests %}
+                    <div class="friend-list-item friend-request-item">
+                        <span class="friend-request-username">
+                            {{ friend_request.sender.username }}
+                        </span>
+
+                        <div class="friend-request-actions">
+                            <form
+                                method="post"
+                                action="{% url 'respond_friend_request' friend_request.id 'accept' %}?friends=requests"
+                            >
+                                {% csrf_token %}
+                                <button type="submit" class="accept-friend-button">
+                                    Accept
+                                </button>
+                            </form>
+
+                            <form
+                                method="post"
+                                action="{% url 'respond_friend_request' friend_request.id 'decline' %}?friends=requests"
+                            >
+                                {% csrf_token %}
+                                <button type="submit" class="decline-friend-button">
+                                    Decline
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                {% empty %}
+                <p class="friends-empty-message">
+                    No pending friend requests.
+                </p>
+            {% endfor %}
+        </div>
+
+    </aside>
+</div>
+
+{% include 'main/_player_menu.html' %}
+<script src="{% static 'js/leaderboard.js' %}"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const toggle = document.getElementById('friendsToggle');
+    const drawer = document.getElementById('friendsDrawer');
+    const backdrop = document.getElementById('friendsBackdrop');
+    const closeButton = document.getElementById('friendsClose');
+
+    if (!toggle || !drawer || !backdrop || !closeButton) return;
+
+    function openDrawer() {
+        drawer.classList.add('is-open');
+        backdrop.classList.add('is-open');
+        document.body.classList.add('friends-drawer-open');
+        toggle.setAttribute('aria-expanded', 'true');
+        drawer.setAttribute('aria-hidden', 'false');
+        closeButton.focus();
+    }
+
+    function closeDrawer() {
+        drawer.classList.remove('is-open');
+        backdrop.classList.remove('is-open');
+        document.body.classList.remove('friends-drawer-open');
+        toggle.setAttribute('aria-expanded', 'false');
+        drawer.setAttribute('aria-hidden', 'true');
+        toggle.focus();
+    }
+
+    toggle.addEventListener('click', openDrawer);
+    closeButton.addEventListener('click', closeDrawer);
+    backdrop.addEventListener('click', closeDrawer);
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && drawer.classList.contains('is-open')) {
+            closeDrawer();
+        }
+    });
+
+    // Keep the drawer open when the page reloads with search results.
+
+    const params = new URLSearchParams(window.location.search);
+
+    if (params.has('friend_search') && params.get('friend_search').trim()) {
+        openDrawer();
+    }
+
+    if (params.get('friends') === 'find') {
+        openDrawer();
+    }
+
+    if (params.get('friends') === 'requests') {
+        openDrawer();
+        activateFriendsTab(true);
+    }
+
+    const friendsTab = document.getElementById('friendsTabFriends');
+    const requestsTab = document.getElementById('friendsTabRequests');
+    const friendsPanel = document.getElementById('friendsPanelFriends');
+    const requestsPanel = document.getElementById('friendsPanelRequests');
+
+    function activateFriendsTab(showRequests) {
+        if (!friendsTab || !requestsTab || !friendsPanel || !requestsPanel) {
+            return;
+        }
+
+        friendsTab.classList.toggle('is-active', !showRequests);
+        requestsTab.classList.toggle('is-active', showRequests);
+
+        friendsTab.setAttribute('aria-selected', String(!showRequests));
+        requestsTab.setAttribute('aria-selected', String(showRequests));
+
+        friendsPanel.hidden = showRequests;
+        requestsPanel.hidden = !showRequests;
+    }
+
+    if (friendsTab && requestsTab) {
+        friendsTab.addEventListener('click', function () {
+            activateFriendsTab(false);
+        });
+
+        requestsTab.addEventListener('click', function () {
+            activateFriendsTab(true);
+        });
+    }
+
+});
+</script>
+
+<script>
+(function () {
+    const toggle = document.getElementById('inviteToggle');
+    const panel = document.getElementById('invitePanel');
+    const shareButton = document.getElementById('inviteShare');
+    const copyButton = document.getElementById('inviteCopy');
+    const status = document.getElementById('inviteStatus');
+
+    if (!toggle || !panel) return;
+
+    toggle.addEventListener('click', function () {
+        const opening = panel.hidden;
+        panel.hidden = !opening;
+        toggle.setAttribute('aria-expanded', String(opening));
+    });
+
+    // Phones: the built-in share sheet (Messages, WhatsApp, Facebook, ...).
+    if (navigator.share && shareButton) {
+        shareButton.hidden = false;
+        shareButton.addEventListener('click', function () {
+            navigator.share({
+                title: 'Join me on GameDayPicks',
+                text: panel.dataset.text,
+                url: panel.dataset.url
+            }).catch(function () { /* they closed the share sheet */ });
+        });
+    }
+
+    function say(message) {
+        status.textContent = message;
+    }
+
+    function copyWithFallback(text) {
+        const box = document.createElement('textarea');
+        box.value = text;
+        box.setAttribute('readonly', '');
+        box.style.position = 'fixed';
+        box.style.opacity = '0';
+        document.body.appendChild(box);
+        box.select();
+        let worked = false;
+        try { worked = document.execCommand('copy'); } catch (e) { worked = false; }
+        document.body.removeChild(box);
+        return worked;
+    }
+
+    copyButton.addEventListener('click', function () {
+        const text = panel.dataset.message;
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text).then(
+                function () { say('Invite copied. Paste it anywhere!'); },
+                function () {
+                    say(copyWithFallback(text)
+                        ? 'Invite copied. Paste it anywhere!'
+                        : 'Could not copy. Please copy it by hand.');
+                }
+            );
+        } else {
+            say(copyWithFallback(text)
+                ? 'Invite copied. Paste it anywhere!'
+                : 'Could not copy. Please copy it by hand.');
+        }
+    });
+})();
+</script>
 {% endblock %}

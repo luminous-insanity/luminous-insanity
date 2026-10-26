@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Pick, UserStatistics  # Import the models
+from .models import Pick, UserStatistics, AchievementUnlock  # Import the models
 
 # Register the Pick model
 @admin.register(Pick)
@@ -13,3 +13,10 @@ class PickAdmin(admin.ModelAdmin):
 class UserStatisticsAdmin(admin.ModelAdmin):
     list_display = ('user', 'wins', 'losses', 'ties')  # Display user statistics
     search_fields = ('user__username',)  # Add search field for user
+
+
+@admin.register(AchievementUnlock)
+class AchievementUnlockAdmin(admin.ModelAdmin):
+    list_display = ('user', 'achievement_key', 'level', 'unlocked_at')
+    list_filter = ('achievement_key', 'level')
+    search_fields = ('user__username', 'achievement_key')

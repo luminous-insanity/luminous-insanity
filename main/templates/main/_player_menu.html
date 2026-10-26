@@ -1,0 +1,40 @@
+<!-- Player action menu: popup on desktop, bottom sheet on phones -->
+<div id="player-menu" class="player-menu" hidden>
+    <div class="player-menu-backdrop" data-menu-close></div>
+    <div class="player-menu-panel" role="dialog" aria-modal="true"
+         aria-labelledby="player-menu-name" tabindex="-1">
+        <div class="player-menu-handle" aria-hidden="true"></div>
+        <div class="player-menu-head">
+            <strong id="player-menu-name"></strong>
+            <dl class="player-menu-stats">
+                <div><dt>Season</dt><dd id="pm-season"></dd></div>
+                <div><dt>Win %</dt><dd id="pm-pct"></dd></div>
+                <div id="pm-week-wrap"><dt id="pm-week-label">Week</dt><dd id="pm-week"></dd></div>
+                <div><dt>Weeks won</dt><dd id="pm-weeks-won"></dd></div>
+                <div><dt>Seasons won</dt><dd id="pm-seasons-won"></dd></div>
+                <div><dt>Challenges</dt><dd id="pm-challenges"></dd></div>
+            </dl>
+        </div>
+        <section id="pm-reactions" class="player-menu-reactions" hidden aria-label="React to this player's performance">
+            <h4 id="pm-reaction-heading">React to this week's performance</h4>
+            <p>Reactions are counted for this week and season only.</p>
+            <div class="player-menu-reaction-buttons">
+                {% for emoji, label in reaction_choices %}
+                    <form method="post" id="pm-reaction-form-{{ forloop.counter }}" action="#">
+                        {% csrf_token %}
+                        <input type="hidden" name="season" value="">
+                        <input type="hidden" name="week" value="">
+                        <input type="hidden" name="emoji" value="{{ emoji }}">
+                        <button type="submit" class="player-menu-reaction" data-reaction-emoji="{{ emoji }}" aria-label="{{ label }} reaction">
+                            {{ emoji }} <span data-reaction-count="{{ emoji }}">0</span>
+                        </button>
+                    </form>
+                {% endfor %}
+            </div>
+        </section>
+        <a id="pm-profile" class="player-menu-item" href="#">View Profile</a>
+        <a id="pm-picks" class="player-menu-item" href="#">View Picks</a>
+        <a id="pm-challenge" class="player-menu-item" href="#">Challenge to Head-to-Head</a>
+        <button type="button" class="player-menu-close" data-menu-close>Close</button>
+    </div>
+</div>

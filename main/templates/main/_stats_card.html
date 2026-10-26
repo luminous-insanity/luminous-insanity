@@ -1,0 +1,42 @@
+<div class="profile-card">
+    <div class="profile-card-heading">
+        <div>
+            <p class="profile-card-eyebrow">{{ stats_label }}</p>
+            <h3>Stats</h3>
+        </div>
+        <span class="profile-card-icon">🏈</span>
+    </div>
+
+    <div class="profile-detail">
+        <span>Season record (W–L–T)</span>
+        <strong>{{ stats.season_record }}</strong>
+    </div>
+    <div class="profile-detail">
+        <span>Season win %</span>
+        <strong>{{ stats.season_pct }}</strong>
+    </div>
+    <div class="profile-detail">
+        <span>Career record (W–L–T)</span>
+        <strong>{{ stats.career_record }}</strong>
+    </div>
+    <div class="profile-detail">
+        <span>Career win %</span>
+        <strong>{{ stats.career_pct }}</strong>
+    </div>
+    <div class="profile-detail">
+        <span>Weeks won</span>
+        <strong>{{ stats.weeks_won }}</strong>
+    </div>
+    <div class="profile-detail">
+        <span>Seasons won</span>
+        <strong>{{ stats.seasons_won }}</strong>
+    </div>
+    <div class="profile-detail">
+        <span>Challenges won</span>
+        <strong>{{ stats.challenges_won }}</strong>
+    </div>
+    <div class="profile-detail">
+        <span>Head-to-head record (W–L–T)</span>
+        <strong>{{ stats.challenge_record }} <small>({{ stats.battles }} battle{{ stats.battles|pluralize }})</small></strong>
+    </div>
+</div>
