@@ -1,101 +1,91 @@
 {% extends 'main/base.html' %}
 
-{% block title %}Compare Picks | GameDayPicks{% endblock %}
+{% block title %}Compare picks | GameDayPicks{% endblock %}
 
 {% block content %}
-<section class="home-leaderboard cmp-page">
-
-    <div class="home-leaderboard-heading">
-        <div>
-            <p class="section-eyebrow">SIDE BY SIDE</p>
-            <h2>YOU vs {{ other.username|upper }}</h2>
-            <p>{{ selected_season }} Season · Week {{ selected_week }}</p>
-        </div>
+<div class="page-head">
+    <div>
+        <h1>You vs {{ other.username }}</h1>
+        <p>{{ selected_season }} season</p>
     </div>
 
-    <div class="lb-week-nav cmp-week-nav">
+    <div class="stepper" role="group" aria-label="Choose a week">
         {% if prev_url %}
-            <a href="{{ prev_url }}" class="lb-week-arrow" aria-label="Previous week" rel="prev">‹</a>
+            <a href="{{ prev_url }}" class="stepper-btn" aria-label="Previous week" rel="prev">&lsaquo;</a>
         {% else %}
-            <span class="lb-week-arrow is-disabled" aria-disabled="true" aria-label="No earlier week">‹</span>
+            <span class="stepper-btn is-disabled" aria-hidden="true">&lsaquo;</span>
         {% endif %}
-        <strong class="cmp-week-label">Week {{ selected_week }}</strong>
+        <span class="stepper-label">Week {{ selected_week }}</span>
         {% if next_url %}
-            <a href="{{ next_url }}" class="lb-week-arrow" aria-label="Next week" rel="next">›</a>
+            <a href="{{ next_url }}" class="stepper-btn" aria-label="Next week" rel="next">&rsaquo;</a>
         {% else %}
-            <span class="lb-week-arrow is-disabled" aria-disabled="true" aria-label="No later week">›</span>
+            <span class="stepper-btn is-disabled" aria-hidden="true">&rsaquo;</span>
         {% endif %}
     </div>
+</div>
 
-    <!-- Records -->
-    <div class="cmp-records">
-        <div class="cmp-record-card is-me">
-            <p class="cmp-who">YOU</p>
-            <p class="cmp-big">{{ my_week.wins }}–{{ my_week.losses }}–{{ my_week.ties }}</p>
-            <p class="cmp-small">Week {{ selected_week }}</p>
-            <p class="cmp-small">Season {{ my_season.wins }}–{{ my_season.losses }}–{{ my_season.ties }} · {{ my_season_pct }}</p>
-        </div>
-        <div class="cmp-record-card">
-            <p class="cmp-who">{{ other.username|upper }}</p>
-            <p class="cmp-big">{{ their_week.wins }}–{{ their_week.losses }}–{{ their_week.ties }}</p>
-            <p class="cmp-small">Week {{ selected_week }}</p>
-            <p class="cmp-small">Season {{ their_season.wins }}–{{ their_season.losses }}–{{ their_season.ties }} · {{ their_season_pct }}</p>
-        </div>
+<div class="vs-records">
+    <div class="vs-record is-me">
+        <p class="vs-who">You</p>
+        <p class="vs-big">{{ my_week.wins }}–{{ my_week.losses }}–{{ my_week.ties }}</p>
+        <p class="muted">Week {{ selected_week }}</p>
+        <p class="muted">Season {{ my_season.wins }}–{{ my_season.losses }}–{{ my_season.ties }} &middot; {{ my_season_pct }}</p>
     </div>
-
-    <p class="cmp-gap cmp-gap-{{ gap_who }}">Season: {{ gap_text }}</p>
-
-    <!-- Summary -->
-    <div class="cmp-summary" role="status">
-        <p class="cmp-differ">You differ on {{ differ }} game{{ differ|pluralize }} this week.</p>
-        {% if my_missing or their_missing or hidden %}
-            <p class="cmp-small">
-                {% if my_missing %}You have {{ my_missing }} game{{ my_missing|pluralize }} with no pick yet.{% endif %}
-                {% if their_missing %}{{ other.username }} has {{ their_missing }} game{{ their_missing|pluralize }} with no pick yet.{% endif %}
-                {% if hidden %}{{ hidden }} of {{ other.username }}'s pick{{ hidden|pluralize }} stay hidden until kickoff (add each other as friends to see picks early).{% endif %}
-                These aren't counted as differences.
-            </p>
-        {% endif %}
+    <div class="vs-record">
+        <p class="vs-who">{{ other.username }}</p>
+        <p class="vs-big">{{ their_week.wins }}–{{ their_week.losses }}–{{ their_week.ties }}</p>
+        <p class="muted">Week {{ selected_week }}</p>
+        <p class="muted">Season {{ their_season.wins }}–{{ their_season.losses }}–{{ their_season.ties }} &middot; {{ their_season_pct }}</p>
     </div>
+</div>
 
-    {% if rows %}
-        <div class="cmp-list">
-            {% for row in rows %}
-                <article class="cmp-game{% if row.differs %} differs{% endif %}">
-                    <header class="cmp-game-head">
+<p class="vs-gap vs-gap-{{ gap_who }}">Season: {{ gap_text }}</p>
+
+<div class="vs-summary" role="status">
+    <p><strong>You differ on {{ differ }} game{{ differ|pluralize }} this week.</strong></p>
+    {% if my_missing or their_missing or hidden %}
+        <p class="muted">
+            {% if my_missing %}You have {{ my_missing }} game{{ my_missing|pluralize }} with no pick yet.{% endif %}
+            {% if their_missing %}{{ other.username }} has {{ their_missing }} game{{ their_missing|pluralize }} with no pick yet.{% endif %}
+            {% if hidden %}{{ hidden }} of {{ other.username }}'s pick{{ hidden|pluralize }} stay hidden until kickoff (add each other as friends to see picks early).{% endif %}
+            These aren't counted as differences.
+        </p>
+    {% endif %}
+</div>
+
+{% if rows %}
+    <div class="vs-list">
+        {% for row in rows %}
+                <article class="vs-game{% if row.differs %} is-different{% endif %}">
+                    <div class="vs-head">
                         <strong>{{ row.game.away_team }} at {{ row.game.home_team }}</strong>
-                        <span>
+                        <span class="muted">
                             {% if row.game.is_final %}
-                                FINAL · {{ row.game.away_team }} {{ row.game.away_score }}, {{ row.game.home_team }} {{ row.game.home_score }}
+                                Final &middot; {{ row.game.away_team }} {{ row.game.away_score }}, {{ row.game.home_team }} {{ row.game.home_score }}
                             {% else %}
                                 {{ row.kickoff_label }}
                             {% endif %}
                         </span>
-                        {% if row.differs %}<em class="cmp-differs-tag">DIFFERENT PICKS</em>{% endif %}
-                    </header>
-                    <div class="cmp-picks">
-                        <div class="cmp-pick">
-                            <span class="cmp-pick-who">You</span>
+                        {% if row.differs %}<span class="pill pill-diff">Different picks</span>{% endif %}
+                    </div>
+                    <div class="vs-picks">
+                        <div class="vs-pick">
+                            <span class="vs-who">You</span>
                             <strong>{% if row.my_team %}{{ row.my_team }}{% else %}—{% endif %}</strong>
-                            <span class="cmp-result res-{{ row.my_state }}">{{ row.my_label }}</span>
+                            <span class="vs-res vs-res-{{ row.my_state }}">{{ row.my_label }}</span>
                         </div>
-                        <div class="cmp-pick">
-                            <span class="cmp-pick-who">{{ other.username }}</span>
+                        <div class="vs-pick">
+                            <span class="vs-who">{{ other.username }}</span>
                             <strong>{% if row.their_team %}{{ row.their_team }}{% else %}—{% endif %}</strong>
-                            <span class="cmp-result res-{{ row.their_state }}">{{ row.their_label }}</span>
+                            <span class="vs-res vs-res-{{ row.their_state }}">{{ row.their_label }}</span>
                         </div>
                     </div>
                 </article>
             {% endfor %}
-        </div>
-    {% else %}
-        <div class="home-leaderboard-list">
-            <p class="no-featured-games">There are no games loaded for this week yet.</p>
-        </div>
-    {% endif %}
-
-    <div class="leaderboard-bottom-link">
-        <a href="{{ back_url }}">← BACK TO LEADERBOARD</a>
     </div>
-</section>
+{% else %}
+    <p class="empty">There are no games loaded for this week yet.</p>
+{% endif %}
+
+<p class="back-link"><a href="{{ back_url }}">&larr; Back to leaderboard</a></p>
 {% endblock %}

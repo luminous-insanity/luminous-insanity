@@ -1,0 +1,14 @@
+{% extends 'main/base.html' %}
+{% block title %}Finish signing up | GameDayPicks{% endblock %}
+{% block content %}
+<div class="auth">
+    <h1>One last step</h1>
+    <p class="muted">Choose how you'll appear on the leaderboard.</p>
+    <form method="post" action="{% url 'socialaccount_signup' %}" class="form">
+        {% csrf_token %}
+        {{ form.as_p }}
+        {% if redirect_field_value %}<input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">{% endif %}
+        <button type="submit" class="btn btn-red btn-block">Finish</button>
+    </form>
+</div>
+{% endblock %}

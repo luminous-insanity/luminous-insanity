@@ -1,0 +1,9 @@
+{% extends 'main/base.html' %}
+{% block title %}Sign-in problem | GameDayPicks{% endblock %}
+{% block content %}
+<div class="auth">
+    <h1>We couldn't sign you in</h1>
+    <p class="muted">Something went wrong while talking to the sign-in provider. Please try again.</p>
+    <a href="{% url 'login' %}" class="btn btn-block">Back to log in</a>
+</div>
+{% endblock %}

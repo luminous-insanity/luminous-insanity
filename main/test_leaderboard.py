@@ -101,7 +101,7 @@ class WeeklyStandingsTests(TestCase):
         self.assertEqual(got["bob"], (0, 0, 0))           # pending only: no loss
         bob = [s for s in response.context["user_stats"] if s.user == self.b][0]
         self.assertEqual(bob.pending, 1)
-        self.assertContains(response, "1 PENDING")
+        self.assertContains(response, "1 pending")
 
     def test_missing_picks_are_not_losses(self):
         pick(self.a, self.g1, "home")                     # alice skipped g2
@@ -136,13 +136,13 @@ class WeeklyStandingsTests(TestCase):
         pick(self.c, self.g1, "away")
         response = self.client.get(URL, {"week": 1})
         self.assertEqual({w.user.username for w in response.context["winners"]}, {"alice", "bob"})
-        self.assertContains(response, "WEEK 1 WINNERS · TIED")
+        self.assertContains(response, "Week 1 winners (tied)")
         self.assertContains(response, "👑")
 
     def test_banner_says_leader_while_the_week_is_still_in_progress(self):
         make_game(week=1)
         pick(self.a, self.g1, "home")
-        self.assertContains(self.client.get(URL, {"week": 1}), "WEEK 1 LEADER")
+        self.assertContains(self.client.get(URL, {"week": 1}), "Week 1 leader")
 
     def test_no_banner_when_nobody_has_won_anything(self):
         pick(self.a, self.g1, "away")
@@ -194,7 +194,7 @@ class FilterTests(TestCase):
         self.client.force_login(self.a)
         response = self.client.get(URL, {"filter": "friends"})
         self.assertContains(response, "Add friends to start your own competition")
-        self.assertContains(response, "Find Friends")
+        self.assertContains(response, "Find friends")
 
     def test_each_tab_remembers_its_own_filter(self):
         befriend(self.a, self.b)
@@ -216,7 +216,7 @@ class FilterTests(TestCase):
 
     def test_logged_in_players_row_is_highlighted(self):
         self.client.force_login(self.a)
-        self.assertContains(self.client.get(URL), "lb-row is-me")
+        self.assertContains(self.client.get(URL), "lb-item is-me")
 
 
 @override_settings(NFL_SEASON=2026)
@@ -274,7 +274,7 @@ class ChampionTests(TestCase):
         self.assertFalse(season_is_finalized(2025))
         response = self.client.get(URL, {"season": 2025, "tab": "season"})
         self.assertIsNone(response.context["champion"])
-        self.assertNotContains(response, "SEASON CHAMPION")
+        self.assertNotContains(response, "season champion")
 
     @override_settings(NFL_SEASON=2026)
     def test_champion_shows_username_record_and_percentage(self):
@@ -284,8 +284,8 @@ class ChampionTests(TestCase):
         champion = response.context["champion"]
         self.assertEqual(champion["champions"],
                          [{"username": "alice", "record": "2–0–0", "pct": "100.0%"}])
-        self.assertContains(response, "2025 SEASON CHAMPION")
-        self.assertContains(response, "View Season Champion")
+        self.assertContains(response, "2025 season champion")
+        self.assertContains(response, "Season champion")
 
     @override_settings(NFL_SEASON=2026)
     def test_co_champions_are_both_recognized(self):

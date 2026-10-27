@@ -3,71 +3,45 @@
 {% block title %}{{ player.username }} | GameDayPicks{% endblock %}
 
 {% block content %}
-<section class="profile-page">
+<div class="narrow">
 
-    <div class="profile-heading">
-        <p class="profile-eyebrow">GAMEDAYPICKS PLAYER</p>
-        <h2>{{ player.username|upper }}</h2>
-        <p>Member since {{ player.date_joined|date:"F Y" }}</p>
-    </div>
-
-    <div class="profile-overview">
-        <div class="profile-avatar">{{ player.username|first|upper }}</div>
-        <div class="profile-identity">
-            <h3>{{ player.username }}</h3>
-            <p>GameDayPicks Member</p>
+    <div class="person">
+        <span class="person-avatar" aria-hidden="true">{{ player.username|first|upper }}</span>
+        <div>
+            <h1>{{ player.username }}</h1>
+            <p class="muted">Member since {{ player.date_joined|date:"F Y" }}</p>
         </div>
     </div>
 
-    {% with stats_label=selected_season|stringformat:"s"|add:" SEASON & CAREER" %}
+    {% with stats_label=selected_season|stringformat:"s"|add:" season & career" %}
         {% include 'main/_stats_card.html' %}
     {% endwith %}
 
-    <div class="profile-card">
-        <div class="profile-card-heading">
-            <div>
-                <p class="profile-card-eyebrow">WEEK {{ stats_week }}</p>
-                <h3>Latest Week</h3>
-            </div>
-            <span class="profile-card-icon">📅</span>
-        </div>
-        <div class="profile-detail">
-            <span>Week {{ stats_week }} record (W–L–T)</span>
-            <strong>{{ week_stats.wins }}–{{ week_stats.losses }}–{{ week_stats.ties }}</strong>
-        </div>
-    </div>
+    <section class="card detail-card">
+        <div class="detail-card-head"><h2>Latest week</h2><span class="muted">Week {{ stats_week }}</span></div>
+        <dl class="detail-list">
+            <div><dt>Week {{ stats_week }} record (W–L–T)</dt><dd>{{ week_stats.wins }}–{{ week_stats.losses }}–{{ week_stats.ties }}</dd></div>
+        </dl>
+    </section>
 
     {% if versus %}
-        <div class="profile-card">
-            <div class="profile-card-heading">
-                <div>
-                    <p class="profile-card-eyebrow">HEAD-TO-HEAD</p>
-                    <h3>You vs {{ player.username }}</h3>
-                </div>
-                <span class="profile-card-icon">⚔</span>
-            </div>
-            <div class="profile-detail">
-                <span>Your record against them (W–L–T)</span>
-                <strong>{{ versus.won }}–{{ versus.lost }}–{{ versus.tied }}</strong>
-            </div>
-            <div class="profile-detail">
-                <span>Battles fought</span>
-                <strong>{{ versus.total }}</strong>
-            </div>
-        </div>
+        <section class="card detail-card">
+            <div class="detail-card-head"><h2>You vs {{ player.username }}</h2><span class="muted">Head-to-head</span></div>
+            <dl class="detail-list">
+                <div><dt>Your record against them (W–L–T)</dt><dd>{{ versus.won }}–{{ versus.lost }}–{{ versus.tied }}</dd></div>
+                <div><dt>Battles fought</dt><dd>{{ versus.total }}</dd></div>
+            </dl>
+        </section>
     {% endif %}
 
-    <div class="profile-actions">
+    <div class="button-row">
         {% if user.is_authenticated %}
-            <a href="{{ challenge_url }}" class="profile-primary-button">⚔ CHALLENGE →</a>
-            <a href="{{ compare_url }}" class="profile-secondary-button">VIEW PICKS</a>
+            <a href="{{ challenge_url }}" class="btn btn-red">⚔ Challenge</a>
+            <a href="{{ compare_url }}" class="btn">View picks</a>
         {% else %}
-            <a href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}" class="profile-primary-button">LOG IN TO CHALLENGE →</a>
+            <a href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}" class="btn btn-red">Log in to challenge</a>
         {% endif %}
-        <a href="{% url 'leaderboard' %}?season={{ selected_season }}" class="profile-secondary-button">
-            BACK TO LEADERBOARD
-        </a>
+        <a href="{% url 'leaderboard' %}?season={{ selected_season }}" class="btn btn-quiet">Back to leaderboard</a>
     </div>
-
-</section>
+</div>
 {% endblock %}

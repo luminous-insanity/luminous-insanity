@@ -1,191 +1,120 @@
-
 {% extends 'main/base.html' %}
+
+{% block title %}Make picks | GameDayPicks{% endblock %}
 
 {% block content %}
 
-<div class="season-header">
-    <h1>{{ selected_season }} NFL Season</h1>
+<div class="page-head">
+    <div>
+        <h1>Make your picks</h1>
+        <p>{{ selected_season }} NFL season</p>
+    </div>
 
-    <form method="get" class="season-filter">
-        <label for="season">Select season:</label>
+    <form method="get" class="inline-form">
+        <label for="season" class="visually-hidden">Season</label>
         <select name="season" id="season" onchange="this.form.submit()">
             {% for season in seasons %}
-                <option value="{{ season }}" {% if selected_season == season %}selected{% endif %}>
-                    {{ season }} Season
-                </option>
+                <option value="{{ season }}" {% if selected_season == season %}selected{% endif %}>{{ season }} season</option>
             {% endfor %}
         </select>
         <input type="hidden" name="week" value="{{ selected_week }}">
     </form>
 </div>
 
-<div class="picks-week-section">
-    <h2 class="picks-week-title">Week {{ selected_week }}</h2>
-
-    <div class="picks-week-nav">
+<div class="week-controls">
+    <div class="stepper" role="group" aria-label="Choose a week">
         {% if selected_week > 1 %}
-            <a href="?season={{ selected_season }}&week={{ selected_week|add:'-1' }}"
-               class="week-nav-link">
-                &larr; Previous Week
-            </a>
+            <a href="?season={{ selected_season }}&week={{ selected_week|add:'-1' }}" class="stepper-btn" rel="prev" aria-label="Previous week">&lsaquo;</a>
+        {% else %}
+            <span class="stepper-btn is-disabled" aria-hidden="true">&lsaquo;</span>
         {% endif %}
-
-        {% if selected_week != current_week %}
-            <a href="?season={{ selected_season }}&week={{ current_week }}"
-               class="week-nav-link current-week-link">
-                This Week
-            </a>
-        {% endif %}
-
+        <span class="stepper-label">Week {{ selected_week }}</span>
         {% if selected_week < 18 %}
-            <a href="?season={{ selected_season }}&week={{ selected_week|add:'1' }}"
-               class="week-nav-link">
-                Next Week &rarr;
-            </a>
+            <a href="?season={{ selected_season }}&week={{ selected_week|add:'1' }}" class="stepper-btn" rel="next" aria-label="Next week">&rsaquo;</a>
+        {% else %}
+            <span class="stepper-btn is-disabled" aria-hidden="true">&rsaquo;</span>
         {% endif %}
     </div>
+
+    {% if selected_week != current_week %}
+        <a href="?season={{ selected_season }}&week={{ current_week }}" class="btn btn-quiet btn-sm">Jump to this week</a>
+    {% endif %}
 </div>
 
-<section class="pick-progress-panel" aria-labelledby="pick-progress-title">
-    <div class="pick-progress-heading">
-        <div>
-            <h3 id="pick-progress-title">Your Week {{ selected_week }} Picks</h3>
-            <p><strong>{{ picked_count }}</strong> of {{ total_games }} complete
-                {% if remaining_count %}<span> · {{ remaining_count }} remaining</span>{% else %}<span> · All picks complete!</span>{% endif %}
-            </p>
-        </div>
-        <button type="button" class="review-picks-button" id="openPickReview" {% if not total_games %}disabled{% endif %}>Review Picks</button>
+<section class="progress-card" aria-labelledby="pick-progress-title">
+    <div class="progress-text">
+        <h2 id="pick-progress-title">{{ picked_count }} of {{ total_games }} picked</h2>
+        <p>{% if remaining_count %}{{ remaining_count }} to go{% else %}You're all set for this week.{% endif %}</p>
     </div>
-    <div class="pick-progress-track" role="progressbar" aria-label="Weekly picks completed" aria-valuemin="0" aria-valuemax="{{ total_games }}" aria-valuenow="{{ picked_count }}">
+    <button type="button" class="btn btn-quiet btn-sm" id="openPickReview" {% if not total_games %}disabled{% endif %}>Review picks</button>
+    <div class="progress-track" role="progressbar" aria-label="Weekly picks completed" aria-valuemin="0" aria-valuemax="{{ total_games }}" aria-valuenow="{{ picked_count }}">
         <span style="width: {{ pick_progress_percent }}%"></span>
     </div>
 </section>
 
-<div class="games-container">
+<div class="matches">
     {% for game_info in game_data %}
-        <div class="game-card">
+        <article class="match {% if game_info.kickoff_label == 'FINAL' %}is-final{% elif game_info.kickoff_label == 'IN PROGRESS' %}is-live{% endif %}">
 
-            <div class="card-header">
+            <div class="match-meta">
                 {% if game_info.kickoff_label == "FINAL" %}
-                    <span class="kickoff-text">GAME COMPLETE</span>
-                    <span class="status-badge final">FINAL</span>
+                    <span class="pill pill-final">Final</span>
                 {% elif game_info.kickoff_label == "IN PROGRESS" %}
-                    <span class="kickoff-text">LIVE GAME</span>
-                    <span class="status-badge live">IN PROGRESS</span>
+                    <span class="pill pill-live">Live</span>
                 {% else %}
-                    <span class="kickoff-text">
-                        {{ game_info.kickoff_label }}
-                    </span>
+                    <span>{{ game_info.kickoff_label }}</span>
+                    {% if not game_info.pick_available %}<span class="pill">Locked</span>{% endif %}
                 {% endif %}
             </div>
 
             {% if game_info.pick_available %}
-                <form method="post"
-                      action="{% url 'make_pick' game_info.game.game_id %}"
-                      class="team-pick-form">
+                <form method="post" action="{% url 'make_pick' game_info.game.game_id %}" class="match-form">
                     {% csrf_token %}
-
-                    <div class="game-team">
+                    <div class="match-teams">
                         <button type="button"
-                                class="team-choice {% if game_info.pick_status == 'away' %}selected{% endif %}"
+                                class="pick-btn {% if game_info.pick_status == 'away' %}selected{% endif %}"
                                 data-team="away"
                                 data-team-name="{{ game_info.game.away_team|escape }}"
                                 aria-pressed="{% if game_info.pick_status == 'away' %}true{% else %}false{% endif %}">
-
-                            <span class="team-abbr">
-                                {{ game_info.game.away_team }}
-                            </span>
-
-                            <span class="team-record">
-                                {% if game_info.away_record %}
-                                    {{ game_info.away_record.wins }}-{{ game_info.away_record.losses }}-{{ game_info.away_record.ties }}
-                                {% endif %}
-                            </span>
-
-                            <span class="team-score {% if game_info.score and game_info.score.away_score > game_info.score.home_score %}winning-score{% endif %}">
-                                {% if game_info.score %}
-                                    {{ game_info.score.away_score }}
-                                {% else %}
-                                    —
-                                {% endif %}
-                            </span>
+                            <span class="pick-abbr">{{ game_info.game.away_team }}</span>
+                            <span class="pick-record">{% if game_info.away_record %}{{ game_info.away_record.wins }}-{{ game_info.away_record.losses }}-{{ game_info.away_record.ties }}{% endif %}</span>
+                            <span class="pick-score {% if game_info.score and game_info.score.away_score > game_info.score.home_score %}winning-score{% endif %}">{% if game_info.score %}{{ game_info.score.away_score }}{% endif %}</span>
                         </button>
-                    </div>
 
-                    <div class="game-team">
                         <button type="button"
-                                class="team-choice {% if game_info.pick_status == 'home' %}selected{% endif %}"
+                                class="pick-btn {% if game_info.pick_status == 'home' %}selected{% endif %}"
                                 data-team="home"
                                 data-team-name="{{ game_info.game.home_team|escape }}"
                                 aria-pressed="{% if game_info.pick_status == 'home' %}true{% else %}false{% endif %}">
-
-                            <span class="team-abbr">
-                                {{ game_info.game.home_team }}
-                            </span>
-
-                            <span class="team-record">
-                                {% if game_info.home_record %}
-                                    {{ game_info.home_record.wins }}-{{ game_info.home_record.losses }}-{{ game_info.home_record.ties }}
-                                {% endif %}
-                            </span>
-
-                            <span class="team-score {% if game_info.score and game_info.score.home_score > game_info.score.away_score %}winning-score{% endif %}">
-                                {% if game_info.score %}
-                                    {{ game_info.score.home_score }}
-                                {% else %}
-                                    —
-                                {% endif %}
-                            </span>
+                            <span class="pick-abbr">{{ game_info.game.home_team }}</span>
+                            <span class="pick-record">{% if game_info.home_record %}{{ game_info.home_record.wins }}-{{ game_info.home_record.losses }}-{{ game_info.home_record.ties }}{% endif %}</span>
+                            <span class="pick-score {% if game_info.score and game_info.score.home_score > game_info.score.away_score %}winning-score{% endif %}">{% if game_info.score %}{{ game_info.score.home_score }}{% endif %}</span>
                         </button>
                     </div>
-
-                    <input type="hidden"
-                           name="team_picked"
-                           value="{{ game_info.pick_status|default:'' }}">
+                    <input type="hidden" name="team_picked" value="{{ game_info.pick_status|default:'' }}">
                 </form>
-
             {% else %}
-                <div class="game-team">
-                    <div class="team-choice {% if game_info.pick_status == 'away' %}selected{% endif %}"
-                         data-team-name="{{ game_info.game.away_team|escape }}">
-                        <span class="team-abbr">{{ game_info.game.away_team }}</span>
-                        <span class="team-record">
-                            {% if game_info.away_record %}
-                                {{ game_info.away_record.wins }}-{{ game_info.away_record.losses }}-{{ game_info.away_record.ties }}
-                            {% endif %}
-                        </span>
-                        <span class="team-score {% if game_info.score and game_info.score.away_score > game_info.score.home_score %}winning-score{% endif %}">
-                            {% if game_info.score %}{{ game_info.score.away_score }}{% else %}—{% endif %}
-                        </span>
+                <div class="match-teams">
+                    <div class="pick-btn {% if game_info.pick_status == 'away' %}selected{% endif %}" data-team-name="{{ game_info.game.away_team|escape }}">
+                        <span class="pick-abbr">{{ game_info.game.away_team }}</span>
+                        <span class="pick-record">{% if game_info.away_record %}{{ game_info.away_record.wins }}-{{ game_info.away_record.losses }}-{{ game_info.away_record.ties }}{% endif %}</span>
+                        <span class="pick-score {% if game_info.score and game_info.score.away_score > game_info.score.home_score %}winning-score{% endif %}">{% if game_info.score %}{{ game_info.score.away_score }}{% endif %}</span>
                     </div>
-                </div>
-
-                <div class="game-team">
-                    <div class="team-choice {% if game_info.pick_status == 'home' %}selected{% endif %}"
-                         data-team-name="{{ game_info.game.home_team|escape }}">
-                        <span class="team-abbr">{{ game_info.game.home_team }}</span>
-                        <span class="team-record">
-                            {% if game_info.home_record %}
-                                {{ game_info.home_record.wins }}-{{ game_info.home_record.losses }}-{{ game_info.home_record.ties }}
-                            {% endif %}
-                        </span>
-                        <span class="team-score {% if game_info.score and game_info.score.home_score > game_info.score.away_score %}winning-score{% endif %}">
-                            {% if game_info.score %}{{ game_info.score.home_score }}{% else %}—{% endif %}
-                        </span>
+                    <div class="pick-btn {% if game_info.pick_status == 'home' %}selected{% endif %}" data-team-name="{{ game_info.game.home_team|escape }}">
+                        <span class="pick-abbr">{{ game_info.game.home_team }}</span>
+                        <span class="pick-record">{% if game_info.home_record %}{{ game_info.home_record.wins }}-{{ game_info.home_record.losses }}-{{ game_info.home_record.ties }}{% endif %}</span>
+                        <span class="pick-score {% if game_info.score and game_info.score.home_score > game_info.score.away_score %}winning-score{% endif %}">{% if game_info.score %}{{ game_info.score.home_score }}{% endif %}</span>
                     </div>
                 </div>
             {% endif %}
 
-            <div class="game-pick">
+            <div class="match-foot">
                 {% if game_info.pick_team %}
-                    <div class="your-pick">
-                        <span>Your Pick</span>
-                        <strong>{{ game_info.pick_team }}</strong>
-                    </div>
-                {% elif not game_info.pick_available %}
-                    <div class="pick-locked">
-                        Picks unavailable (game started)
-                    </div>
+                    <span>Your pick: <strong>{{ game_info.pick_team }}</strong></span>
+                {% elif game_info.pick_available %}
+                    <span class="muted">Not picked yet</span>
+                {% else %}
+                    <span class="muted">No pick made. This game has started.</span>
                 {% endif %}
             </div>
 
@@ -196,44 +125,45 @@
                          data-home-team="{{ game_info.game.home_team|escape }}"
                          data-away-percent="{{ game_info.community_away_percent }}"
                          data-home-percent="{{ game_info.community_home_percent }}">
-                    <div class="community-picks-heading">
-                        <strong>Site Picks</strong>
+                    <div class="community-head">
+                        <span>What everyone picked</span>
                         <span>{{ game_info.community_pick_total }} pick{{ game_info.community_pick_total|pluralize }}</span>
                     </div>
-                    <div class="community-picks-bar" role="img" aria-label="{{ game_info.game.away_team }} {{ game_info.community_away_percent }} percent, {{ game_info.game.home_team }} {{ game_info.community_home_percent }} percent">
+                    <div class="community-bar" role="img" aria-label="{{ game_info.game.away_team }} {{ game_info.community_away_percent }} percent, {{ game_info.game.home_team }} {{ game_info.community_home_percent }} percent">
                         <span class="community-bar-away" style="width: {{ game_info.community_away_percent }}%"></span>
                         <span class="community-bar-home" style="width: {{ game_info.community_home_percent }}%"></span>
                     </div>
-                    <div class="community-picks-legend">
-                        <span class="community-away-label">{{ game_info.game.away_team }} <strong>{{ game_info.community_away_percent }}%</strong></span>
-                        <span class="community-home-label">{{ game_info.game.home_team }} <strong>{{ game_info.community_home_percent }}%</strong></span>
+                    <div class="community-legend">
+                        <span>{{ game_info.game.away_team }} <strong>{{ game_info.community_away_percent }}%</strong></span>
+                        <span>{{ game_info.game.home_team }} <strong>{{ game_info.community_home_percent }}%</strong></span>
                     </div>
                 </section>
             {% endif %}
-
-        </div>
+        </article>
     {% empty %}
-        <p>No games available for this week.</p>
+        <p class="empty">No games are scheduled for this week yet.</p>
     {% endfor %}
 </div>
 
-<dialog class="pick-review-dialog" id="pickReviewDialog" aria-labelledby="pickReviewTitle">
-    <div class="pick-review-header">
-        <div><p class="review-eyebrow">FINAL CHECK</p><h2 id="pickReviewTitle">Week {{ selected_week }} Pick Review</h2></div>
-        <button type="button" class="review-close" id="closePickReview" aria-label="Close review">&times;</button>
+<dialog class="review-dialog" id="pickReviewDialog" aria-labelledby="pickReviewTitle">
+    <div class="review-head">
+        <h2 id="pickReviewTitle">Week {{ selected_week }} picks</h2>
+        <button type="button" class="icon-btn-plain" id="closePickReview" aria-label="Close review">&times;</button>
     </div>
-    <p class="review-count">{{ picked_count }} of {{ total_games }} picks complete · {{ remaining_count }} remaining</p>
-    <div class="pick-review-list">
+    <p class="review-count">{{ picked_count }} of {{ total_games }} picked{% if remaining_count %} &middot; {{ remaining_count }} to go{% endif %}</p>
+    <div class="review-list">
         {% for game_info in game_data %}
-            <div class="pick-review-row">
+            <div class="review-row">
                 <div><strong>{{ game_info.game.away_team }} @ {{ game_info.game.home_team }}</strong><small>{{ game_info.kickoff_label }}</small></div>
                 <span class="review-pick {% if not game_info.pick_team %}review-missing{% endif %}">
-                    {% if game_info.pick_team %}{{ game_info.pick_team }}{% elif not game_info.pick_available %}Locked · no pick{% else %}Not picked{% endif %}
+                    {% if game_info.pick_team %}{{ game_info.pick_team }}{% elif not game_info.pick_available %}Locked, no pick{% else %}Not picked{% endif %}
                 </span>
             </div>
         {% endfor %}
     </div>
-    <div class="pick-review-footer"><span>{% if remaining_count %}You can still select any unlocked games on this page.{% else %}You're all set for this week.{% endif %}</span><button type="button" class="review-done-button" id="donePickReview">Back to Picks</button></div>
+    <div class="review-foot">
+        <button type="button" class="btn" id="donePickReview">Back to picks</button>
+    </div>
 </dialog>
 
 <script>
@@ -335,7 +265,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // Apply team colors and abbreviations.
-    document.querySelectorAll(".team-choice[data-team-name]").forEach(function (row) {
+    document.querySelectorAll(".pick-btn[data-team-name]").forEach(function (row) {
         const code = getTeamCode(row.dataset.teamName);
         const colors = teamColors[code];
 
@@ -344,7 +274,7 @@ document.addEventListener("DOMContentLoaded", function () {
         row.style.setProperty("--team-color", colors[0]);
         row.style.setProperty("--team-tint", colors[1]);
 
-        const badge = row.querySelector(".team-abbr");
+        const badge = row.querySelector(".pick-abbr");
         if (badge) {
             badge.textContent = code;
         }
@@ -361,15 +291,15 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     // Select a team and submit the existing Django pick form.
-    document.querySelectorAll(".team-choice[data-team]").forEach(function (button) {
+    document.querySelectorAll(".pick-btn[data-team]").forEach(function (button) {
         button.addEventListener("click", function () {
-            const form = this.closest(".team-pick-form");
+            const form = this.closest(".match-form");
             if (!form) return;
 
             const hiddenInput = form.querySelector('input[name="team_picked"]');
             if (!hiddenInput) return;
 
-            form.querySelectorAll(".team-choice[data-team]").forEach(function (team) {
+            form.querySelectorAll(".pick-btn[data-team]").forEach(function (team) {
                 team.classList.remove("selected");
                 team.setAttribute("aria-pressed", "false");
             });

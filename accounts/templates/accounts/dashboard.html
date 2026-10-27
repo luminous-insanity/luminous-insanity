@@ -1,199 +1,137 @@
 {% extends 'main/base.html' %}
 {% load static %}
+
+{% block title %}Dashboard | GameDayPicks{% endblock %}
+
 {% block content %}
-<style>
-.dashboard-activity-feed{margin:1rem 0;padding:1rem;border:1px solid var(--border-color, #d8dee8);border-radius:14px;background:var(--card-bg, #fff)}
-.dashboard-activity-feed h2{margin:0;font-size:1.15rem}.activity-feed-subtitle{margin:.25rem 0 .8rem;color:var(--muted-text, #687386);font-size:.9rem}
-.activity-feed-list{list-style:none;margin:0;padding:0}.activity-feed-item{display:flex;align-items:center;gap:.7rem;padding:.75rem 0;border-top:1px solid var(--border-color, #e5e7eb)}
-.activity-feed-icon{font-size:1.35rem;flex:0 0 auto}.activity-feed-copy{flex:1;min-width:0}.activity-feed-copy p{margin:0}.activity-feed-copy small{display:block;margin-top:.2rem;color:var(--muted-text, #687386)}
-.activity-feed-link{font-size:.9rem;font-weight:600;white-space:nowrap}.activity-feed-empty{margin:.75rem 0 0;color:var(--muted-text, #687386)}
-@media(max-width:480px){.dashboard-activity-feed{padding:.8rem}.activity-feed-item{gap:.5rem}}
-</style>
 <div class="dashboard-layout">
 
-    <div class="dashboard-main">
-        <div class="profile-actions">
-            <a href="{% url 'profile' %}" class="profile-text-link">
-                My Profile <span aria-hidden="true">→</span>
-            </a>
+    <div class="page-head">
+        <div>
+            <h1>Dashboard</h1>
+            <p>{{ selected_season }} season</p>
         </div>
 
-        <div class="user-stats">
-            <h1>Your Activity — {{ selected_season }} Season</h1>
-
-            <div class="record-section">
-                <h3>Your Record</h3>
-
-                <form method="get" class="record-filter">
-                    <label for="season">Season:</label>
-                    <select name="season" id="season" onchange="this.form.submit()">
-                        {% for season in seasons %}
-                            <option value="{{ season }}"
-                                {% if selected_season == season %}selected{% endif %}>
-                                {{ season }} Season
-                            </option>
-                        {% endfor %}
-                    </select>
-
-                    <label for="record_week">View record:</label>
-                    <select name="record_week" id="record_week" onchange="this.form.submit()">
-                        <option value="season"
-                            {% if record_week == 'season' %}selected{% endif %}>
-                            Season Overall
-                        </option>
-                        {% for week in weeks %}
-                            <option value="{{ week }}"
-                                {% if record_week == week|stringformat:"s" %}selected{% endif %}>
-                                Week {{ week }}
-                            </option>
-                        {% endfor %}
-                    </select>
-
-                    <noscript>
-                        <button type="submit">Show Record</button>
-                    </noscript>
-                </form>
-
-                <div class="stats-container">
-                    <div class="stats-item stats-wins">
-                        <span class="stats-label">Wins</span>
-                        <span class="stats-number">{{ user_stats.wins }}</span>
-                    </div>
-                    <div class="stats-item stats-losses">
-                        <span class="stats-label">Losses</span>
-                        <span class="stats-number">{{ user_stats.losses }}</span>
-                    </div>
-                    <div class="stats-item stats-ties">
-                        <span class="stats-label">Ties</span>
-                        <span class="stats-number">{{ user_stats.ties }}</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="record-section stats-extended">
-                <h3>Your Stats</h3>
-                <div class="stats-grid">
-                    <div class="stats-tile">
-                        <span class="stats-label">Weeks Won</span>
-                        <span class="stats-number">{{ my_stats.weeks_won }}</span>
-                    </div>
-                    <div class="stats-tile">
-                        <span class="stats-label">Seasons Won</span>
-                        <span class="stats-number">{{ my_stats.seasons_won }}</span>
-                    </div>
-                    <div class="stats-tile">
-                        <span class="stats-label">{{ selected_season }} Win %</span>
-                        <span class="stats-number">{{ my_stats.season_pct }}</span>
-                    </div>
-                    <div class="stats-tile">
-                        <span class="stats-label">Career Win %</span>
-                        <span class="stats-number">{{ my_stats.career_pct }}</span>
-                    </div>
-                    <div class="stats-tile">
-                        <span class="stats-label">Challenges Won</span>
-                        <span class="stats-number">{{ my_stats.challenges_won }}</span>
-                    </div>
-                    <div class="stats-tile">
-                        <span class="stats-label">Head-to-Head</span>
-                        <span class="stats-number">{{ my_stats.challenge_record }}</span>
-                        <span class="stats-sub">{{ my_stats.battles }} battle{{ my_stats.battles|pluralize }}</span>
-                    </div>
-                </div>
-
-                <a href="{% url 'challenges' %}" class="dashboard-challenges-card">
-                    <span class="dashboard-challenges-title">
-                        ⚔ Head-to-Head Challenges
-                        {% if pending_challenges %}<span class="friend-request-dot" aria-hidden="true"></span>{% endif %}
-                    </span>
-                    <small>
-                        {% if pending_challenges %}
-                            {{ pending_challenges }} waiting for your answer
-                        {% else %}
-                            Tap a friend to challenge them to a game or a week
-                        {% endif %}
-                    </small>
-                </a>
-            </div>
-
-            <section class="achievement-showcase" aria-labelledby="achievement-showcase-title">
-                <div class="achievement-showcase-heading">
-                    <div>
-                        <p class="achievement-eyebrow">YOUR MILESTONES</p>
-                        <h3 id="achievement-showcase-title">🏆 Trophy Case</h3>
-                        <p>{{ achievement_summary.unlocked_count }} of {{ achievement_summary.total_levels }} milestones unlocked</p>
-                    </div>
-                    <a href="{% url 'achievements' %}">View all →</a>
-                </div>
-                <div class="achievement-preview-grid">
-                    {% for achievement in achievement_summary.cards %}
-                        {% if achievement.unlocked_count or forloop.counter <= 3 %}
-                            <div class="achievement-preview-card {% if achievement.complete %}is-complete{% endif %}">
-                                <span class="achievement-preview-icon" aria-hidden="true">{% if achievement.complete %}🏆{% elif achievement.unlocked_count %}🥇{% else %}🔒{% endif %}</span>
-                                <strong>{{ achievement.title }}</strong>
-                                <span>{{ achievement.unlocked_count }}/{{ achievement.total_levels }} levels</span>
-                                {% if achievement.next_threshold %}
-                                    <div class="achievement-progress" role="progressbar" aria-label="{{ achievement.title }} progress" aria-valuemin="0" aria-valuemax="{{ achievement.next_threshold }}" aria-valuenow="{{ achievement.next_progress }}">
-                                        <span style="width:{{ achievement.next_percent }}%"></span>
-                                    </div>
-                                {% else %}
-                                    <span class="achievement-complete-label">Complete</span>
-                                {% endif %}
-                            </div>
-                        {% endif %}
-                    {% endfor %}
-                </div>
-            </section>
-
-            <div class="activity-actions">
-                <a href="{% url 'picks' %}?season={{ selected_season }}" class="dashboard-primary-button">MAKE PICKS</a>
-                <a href="{% url 'leaderboard' %}?season={{ selected_season }}" class="dashboard-secondary-button">VIEW LEADERBOARD</a>
-            </div>
-        </div>
-    </div>
-
-
-    <section class="dashboard-notifications" aria-label="Notifications">
-        <details class="notification-dropdown" {% if incoming_requests or received_reactions %}data-has-notifications="1"{% endif %}>
-            <summary>
-                <span aria-hidden="true">🔔</span> Notifications
-                {% if incoming_requests or received_reactions %}<span class="notification-count">{{ notification_count }}</span>{% endif %}
+        <details class="notify" {% if incoming_requests or received_reactions %}data-has-notifications="1"{% endif %}>
+            <summary class="btn btn-quiet btn-sm">
+                Notifications
+                {% if incoming_requests or received_reactions %}<span class="count-badge">{{ notification_count }}</span>{% endif %}
             </summary>
-            <div class="notification-dropdown-panel">
+            <div class="notify-panel">
                 {% for reaction in received_reactions %}
-                    <p class="notification-message"><strong>{{ reaction.reactor.username }}</strong> reacted {{ reaction.emoji }} to your Week {{ reaction.week }} / {{ reaction.season }} season record.</p>
+                    <p><strong>{{ reaction.reactor.username }}</strong> reacted {{ reaction.emoji }} to your week {{ reaction.week }} record.</p>
                 {% endfor %}
                 {% for friend_request in incoming_requests %}
-                    <p class="notification-message"><strong>{{ friend_request.sender.username }}</strong> sent you a friend request.
-                        <a href="#friendsPanelRequests" class="notification-action" data-open-friend-requests>View request</a>
+                    <p><strong>{{ friend_request.sender.username }}</strong> sent you a friend request.
+                        <a href="#friendsPanelRequests" data-open-friend-requests>View request</a>
                     </p>
                 {% endfor %}
-                {% if not received_reactions and not incoming_requests %}<p class="notification-empty">You're all caught up.</p>{% endif %}
+                {% if not received_reactions and not incoming_requests %}<p class="muted">You're all caught up.</p>{% endif %}
             </div>
         </details>
+    </div>
+
+    <section class="scoreboard" aria-labelledby="record-title">
+        <div class="scoreboard-head">
+            <h2 id="record-title">Your record</h2>
+            <form method="get" class="inline-form">
+                <label for="season" class="visually-hidden">Season</label>
+                <select name="season" id="season" onchange="this.form.submit()">
+                    {% for season in seasons %}
+                        <option value="{{ season }}" {% if selected_season == season %}selected{% endif %}>{{ season }} season</option>
+                    {% endfor %}
+                </select>
+                <label for="record_week" class="visually-hidden">Record to show</label>
+                <select name="record_week" id="record_week" onchange="this.form.submit()">
+                    <option value="season" {% if record_week == 'season' %}selected{% endif %}>Whole season</option>
+                    {% for week in weeks %}
+                        <option value="{{ week }}" {% if record_week == week|stringformat:"s" %}selected{% endif %}>Week {{ week }}</option>
+                    {% endfor %}
+                </select>
+                <noscript><button type="submit" class="btn btn-sm">Show</button></noscript>
+            </form>
+        </div>
+
+        <div class="score-row">
+            <div class="score-cell"><span class="score-num">{{ user_stats.wins }}</span><span class="score-label">Wins</span></div>
+            <div class="score-cell"><span class="score-num">{{ user_stats.losses }}</span><span class="score-label">Losses</span></div>
+            <div class="score-cell"><span class="score-num">{{ user_stats.ties }}</span><span class="score-label">Ties</span></div>
+        </div>
+
+        <div class="scoreboard-actions">
+            <a href="{% url 'picks' %}?season={{ selected_season }}" class="btn btn-red">Make picks</a>
+            <a href="{% url 'leaderboard' %}?season={{ selected_season }}" class="btn btn-quiet">Leaderboard</a>
+        </div>
     </section>
 
-    <section class="dashboard-activity-feed" aria-labelledby="activity-feed-title">
-        <h2 id="activity-feed-title">Recent Activity</h2>
-        <p class="activity-feed-subtitle">Achievements and competition updates.</p>
+    <section class="section" aria-labelledby="stats-title">
+        <div class="section-head"><h2 id="stats-title">Your stats</h2></div>
+        <div class="stat-grid">
+            <div class="stat"><span class="stat-num">{{ my_stats.weeks_won }}</span><span class="stat-label">Weeks won</span></div>
+            <div class="stat"><span class="stat-num">{{ my_stats.seasons_won }}</span><span class="stat-label">Seasons won</span></div>
+            <div class="stat"><span class="stat-num">{{ my_stats.season_pct }}</span><span class="stat-label">{{ selected_season }} win rate</span></div>
+            <div class="stat"><span class="stat-num">{{ my_stats.career_pct }}</span><span class="stat-label">Career win rate</span></div>
+            <div class="stat"><span class="stat-num">{{ my_stats.challenges_won }}</span><span class="stat-label">Challenges won</span></div>
+            <div class="stat"><span class="stat-num">{{ my_stats.challenge_record }}</span><span class="stat-label">Head-to-head &middot; {{ my_stats.battles }} battle{{ my_stats.battles|pluralize }}</span></div>
+        </div>
+
+        <a href="{% url 'challenges' %}" class="challenge-link">
+            <span>
+                <strong>Head-to-head challenges</strong>
+                <small>
+                    {% if pending_challenges %}{{ pending_challenges }} waiting for your answer{% else %}Challenge a friend to a game or a week.{% endif %}
+                </small>
+            </span>
+            {% if pending_challenges %}<span class="count-badge">{{ pending_challenges }}</span>{% endif %}
+        </a>
+    </section>
+
+    <section class="section" aria-labelledby="achievement-showcase-title">
+        <div class="section-head">
+            <h2 id="achievement-showcase-title">Trophy case</h2>
+            <a href="{% url 'achievements' %}">{{ achievement_summary.unlocked_count }} of {{ achievement_summary.total_levels }} unlocked</a>
+        </div>
+        <div class="trophy-grid">
+            {% for achievement in achievement_summary.cards %}
+                {% if achievement.unlocked_count or forloop.counter <= 3 %}
+                    <div class="trophy {% if achievement.complete %}is-complete{% endif %} {% if not achievement.unlocked_count %}is-locked{% endif %}">
+                        <span class="trophy-icon" aria-hidden="true">{% if achievement.complete %}🏆{% elif achievement.unlocked_count %}🥇{% else %}🔒{% endif %}</span>
+                        <strong>{{ achievement.title }}</strong>
+                        <span class="muted">{{ achievement.unlocked_count }}/{{ achievement.total_levels }} levels</span>
+                        {% if achievement.next_threshold %}
+                            <div class="progress-track" role="progressbar" aria-label="{{ achievement.title }} progress" aria-valuemin="0" aria-valuemax="{{ achievement.next_threshold }}" aria-valuenow="{{ achievement.next_progress }}">
+                                <span style="width:{{ achievement.next_percent }}%"></span>
+                            </div>
+                        {% else %}
+                            <span class="pill">Complete</span>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="section" aria-labelledby="activity-feed-title">
+        <div class="section-head"><h2 id="activity-feed-title">Recent activity</h2></div>
         {% if activity_feed %}
-            <ul class="activity-feed-list">
+            <ul class="feed">
                 {% for item in activity_feed %}
-                    <li class="activity-feed-item">
-                        <span class="activity-feed-icon" aria-hidden="true">{{ item.icon }}</span>
-                        <div class="activity-feed-copy">
+                    <li>
+                        <span class="feed-icon" aria-hidden="true">{{ item.icon }}</span>
+                        <div class="feed-copy">
                             <p>{{ item.message }}</p>
-                            <small>{{ item.detail }} · {{ item.at|timesince }} ago</small>
+                            <small>{{ item.detail }} &middot; {{ item.at|timesince }} ago</small>
                         </div>
-                        <a href="{{ item.url }}" class="activity-feed-link" aria-label="View related activity">View</a>
+                        <a href="{{ item.url }}" aria-label="View related activity">View</a>
                     </li>
                 {% endfor %}
             </ul>
         {% else %}
-            <p class="activity-feed-empty">Your competition activity will appear here as friends earn achievements and challenges progress.</p>
+            <p class="empty">Friends' achievements and challenge results will show up here.</p>
         {% endif %}
     </section>
 
-    <!-- Friends drawer toggle -->
+<!-- Friends drawer toggle -->
     <button
         type="button"
         class="friends-toggle"

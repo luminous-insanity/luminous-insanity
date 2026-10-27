@@ -30,23 +30,23 @@ class HomePageTests(TestCase):
     def test_loads_for_visitors(self):
         response = self.client.get(reverse("home"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "EVERY GAME")
-        self.assertContains(response, "JOIN THE GAME")
-        self.assertNotContains(response, "MAKE YOUR PICKS")
+        self.assertContains(response, "Pick every game")
+        self.assertContains(response, "Join for free")
+        self.assertNotContains(response, "Make your picks")
 
     def test_logged_in_players_get_pick_links_and_a_welcome(self):
         self.client.force_login(make_user("alice"))
         response = self.client.get(reverse("home"))
-        self.assertContains(response, "MAKE YOUR PICKS")
-        self.assertContains(response, "READY TO MAKE YOUR PICKS, ALICE?")
-        self.assertNotContains(response, "JOIN THE GAME")
+        self.assertContains(response, "Make your picks")
+        self.assertContains(response, "Welcome back, alice.")
+        self.assertNotContains(response, "Join for free")
 
     def test_previews_only_the_current_weeks_games(self):
         make_game(week=1, home_team="KC", away_team="BAL")
         make_game(week=2, home_team="NYG", away_team="DAL")
         response = self.client.get(reverse("home"))
         self.assertEqual(response.context["current_week"], 1)
-        self.assertContains(response, "WEEK 1 PREVIEW")
+        self.assertContains(response, "Week 1 games")
         self.assertEqual([g.home_team for g in response.context["featured_games"]], ["KC"])
         self.assertNotContains(response, "NYG")
 
@@ -57,23 +57,23 @@ class HomePageTests(TestCase):
 
     def test_upcoming_game_label(self):
         make_game()
-        self.assertContains(self.client.get(reverse("home")), "UPCOMING")
+        self.assertContains(self.client.get(reverse("home")), "tile-meta")
 
     def test_started_game_label_and_no_score_yet(self):
         make_game(kickoff=ago(1))
         response = self.client.get(reverse("home"))
-        self.assertContains(response, "IN PROGRESS")
-        self.assertNotContains(response, 'class="team-score"')
+        self.assertContains(response, "Live")
+        self.assertNotContains(response, "tile-score")
 
     def test_final_game_shows_both_scores(self):
         make_final(make_game(), 27, 20)
         response = self.client.get(reverse("home"))
-        self.assertContains(response, "FINAL")
-        self.assertContains(response, '<span class="team-score">27</span>')
-        self.assertContains(response, '<span class="team-score">20</span>')
+        self.assertContains(response, "Final")
+        self.assertContains(response, '<span class="tile-score has-score">27</span>')
+        self.assertContains(response, '<span class="tile-score has-score">20</span>')
 
     def test_message_when_no_games_are_loaded(self):
-        self.assertContains(self.client.get(reverse("home")), "The schedule isn't available yet")
+        self.assertContains(self.client.get(reverse("home")), "The schedule isn't loaded yet")
 
     def test_top_three_players_are_shown_in_order(self):
         alice, bob, carol, dave = (make_user(n) for n in ("alice", "bob", "carol", "dave"))
@@ -93,7 +93,7 @@ class HomePageTests(TestCase):
         self.assertEqual([s.user.username for s in standings], ["friend"])
 
     def test_message_when_nobody_has_signed_up(self):
-        self.assertContains(self.client.get(reverse("home")), "The leaderboard will appear here")
+        self.assertContains(self.client.get(reverse("home")), "Standings appear once players start picking")
 
 
 # ---------------------------------------------------------- leaderboard page --
@@ -108,7 +108,7 @@ class LeaderboardPageTests(TestCase):
     def test_message_when_nobody_has_signed_up(self):
         self.assertContains(
             self.client.get(reverse("leaderboard")),
-            "No standings are available for this selection yet.",
+            "No standings for this selection yet.",
         )
 
     def test_ranks_friends_and_hides_admin_accounts(self):
@@ -122,7 +122,7 @@ class LeaderboardPageTests(TestCase):
         standings = response.context["user_stats"]
         self.assertEqual([(s.user.username, s.wins, s.losses) for s in standings],
                          [("bob", 2, 0), ("alice", 0, 1)])
-        self.assertContains(response, "01")
+        self.assertContains(response, "lb-rank")
         self.assertNotContains(response, "theadmin")
 
     def test_unplayed_games_do_not_count(self):
@@ -175,8 +175,8 @@ class NavigationTests(TestCase):
 
     def test_visitors_see_sign_up_and_login(self):
         response = self.client.get(reverse("home"))
-        self.assertContains(response, "Sign Up")
-        self.assertContains(response, "Login")
+        self.assertContains(response, "Sign up")
+        self.assertContains(response, "Log in")
         self.assertNotContains(response, "Logged in as")
 
     def test_logged_in_players_see_who_they_are_with_a_profile_link(self):
@@ -184,8 +184,8 @@ class NavigationTests(TestCase):
         response = self.client.get(reverse("home"))
         self.assertContains(response, "alice")
         self.assertContains(response, f'href="{reverse("profile")}"')
-        self.assertContains(response, "Logout")
-        self.assertNotContains(response, "Sign Up")
+        self.assertContains(response, "Log out")
+        self.assertNotContains(response, "Sign up")
 
 
 @override_settings(NFL_SEASON=2026)

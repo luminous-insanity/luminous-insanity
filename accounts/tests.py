@@ -150,8 +150,9 @@ class DashboardTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["user_stats"].wins, 1)
         self.assertEqual(response.context["user_stats"].losses, 0)
-        self.assertContains(response, "stats-wins")
-        self.assertContains(response, "stats-losses")
+        self.assertContains(response, "score-cell")
+        self.assertContains(response, "Wins")
+        self.assertContains(response, "Losses")
 
     def test_dashboard_does_not_contain_pick_forms(self):
         make_game()

@@ -3,56 +3,51 @@
 {% block title %}Challenges | GameDayPicks{% endblock %}
 
 {% block content %}
-<section class="challenges-page">
-
-    <div class="challenges-heading">
-        <p class="section-eyebrow">HEAD-TO-HEAD</p>
-        <h2>CHALLENGES</h2>
+<div class="page-head">
+    <div>
+        <h1>Challenges</h1>
         <p>Dare a friend on one game or a whole week. Best picks win.</p>
     </div>
+</div>
 
-    <div class="challenges-summary">
-        <div><span>Challenges won</span><strong>{{ won }}</strong></div>
-        <div><span>Record (W–L–T)</span><strong>{{ record }}</strong></div>
-        <div><span>Battles fought</span><strong>{{ battles }}</strong></div>
+<div class="stat-grid stat-grid-3">
+    <div class="stat"><span class="stat-num">{{ won }}</span><span class="stat-label">Challenges won</span></div>
+    <div class="stat"><span class="stat-num">{{ record }}</span><span class="stat-label">Record (W–L–T)</span></div>
+    <div class="stat"><span class="stat-num">{{ battles }}</span><span class="stat-label">Battles fought</span></div>
+</div>
+
+{% if nothing_yet %}
+    <div class="empty">
+        <p>No challenges yet.</p>
+        <p>Tap a friend on your dashboard or a player on the leaderboard, then choose <strong>Challenge to Head-to-Head</strong>.</p>
+        <a href="{% url 'dashboard' %}?friends=find" class="btn btn-sm">Find a friend to challenge</a>
     </div>
+{% endif %}
 
-    {% if nothing_yet %}
-        <div class="challenges-empty">
-            <p>No challenges yet.</p>
-            <p>Tap a friend on your dashboard or a player on the leaderboard, then choose
-               <strong>Challenge to Head-to-Head</strong>.</p>
-            <a href="{% url 'dashboard' %}?friends=find" class="challenge-btn challenge-btn-accept">Find a Friend to Challenge</a>
-        </div>
-    {% endif %}
+{% if incoming %}
+    <h2 class="group-title">Waiting for your answer <span class="count-badge" aria-label="New">{{ incoming|length }}</span></h2>
+    {% for r in incoming %}{% include 'accounts/_challenge_card.html' %}{% endfor %}
+{% endif %}
 
-    {% if incoming %}
-        <h3 class="challenges-group">Waiting for your answer <span class="friend-request-dot" aria-label="New"></span></h3>
-        {% for r in incoming %}{% include 'accounts/_challenge_card.html' %}{% endfor %}
-    {% endif %}
+{% if active %}
+    <h2 class="group-title">In progress</h2>
+    {% for r in active %}{% include 'accounts/_challenge_card.html' %}{% endfor %}
+{% endif %}
 
-    {% if active %}
-        <h3 class="challenges-group">In progress</h3>
-        {% for r in active %}{% include 'accounts/_challenge_card.html' %}{% endfor %}
-    {% endif %}
+{% if outgoing %}
+    <h2 class="group-title">Waiting for a reply</h2>
+    {% for r in outgoing %}{% include 'accounts/_challenge_card.html' %}{% endfor %}
+{% endif %}
 
-    {% if outgoing %}
-        <h3 class="challenges-group">Waiting for a reply</h3>
-        {% for r in outgoing %}{% include 'accounts/_challenge_card.html' %}{% endfor %}
-    {% endif %}
+{% if finished %}
+    <h2 class="group-title">Finished</h2>
+    {% for r in finished %}{% include 'accounts/_challenge_card.html' %}{% endfor %}
+{% endif %}
 
-    {% if finished %}
-        <h3 class="challenges-group">Finished</h3>
-        {% for r in finished %}{% include 'accounts/_challenge_card.html' %}{% endfor %}
-    {% endif %}
+{% if past %}
+    <h2 class="group-title">Declined, cancelled or expired</h2>
+    {% for r in past %}{% include 'accounts/_challenge_card.html' %}{% endfor %}
+{% endif %}
 
-    {% if past %}
-        <h3 class="challenges-group">Declined, cancelled or expired</h3>
-        {% for r in past %}{% include 'accounts/_challenge_card.html' %}{% endfor %}
-    {% endif %}
-
-    <div class="leaderboard-bottom-link">
-        <a href="{% url 'dashboard' %}">← BACK TO DASHBOARD</a>
-    </div>
-</section>
+<p class="back-link"><a href="{% url 'dashboard' %}">&larr; Back to dashboard</a></p>
 {% endblock %}

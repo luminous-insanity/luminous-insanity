@@ -1,42 +1,16 @@
-<div class="profile-card">
-    <div class="profile-card-heading">
-        <div>
-            <p class="profile-card-eyebrow">{{ stats_label }}</p>
-            <h3>Stats</h3>
-        </div>
-        <span class="profile-card-icon">🏈</span>
+<section class="card detail-card">
+    <div class="detail-card-head">
+        <h2>Stats</h2>
+        <span class="muted">{{ stats_label }}</span>
     </div>
-
-    <div class="profile-detail">
-        <span>Season record (W–L–T)</span>
-        <strong>{{ stats.season_record }}</strong>
-    </div>
-    <div class="profile-detail">
-        <span>Season win %</span>
-        <strong>{{ stats.season_pct }}</strong>
-    </div>
-    <div class="profile-detail">
-        <span>Career record (W–L–T)</span>
-        <strong>{{ stats.career_record }}</strong>
-    </div>
-    <div class="profile-detail">
-        <span>Career win %</span>
-        <strong>{{ stats.career_pct }}</strong>
-    </div>
-    <div class="profile-detail">
-        <span>Weeks won</span>
-        <strong>{{ stats.weeks_won }}</strong>
-    </div>
-    <div class="profile-detail">
-        <span>Seasons won</span>
-        <strong>{{ stats.seasons_won }}</strong>
-    </div>
-    <div class="profile-detail">
-        <span>Challenges won</span>
-        <strong>{{ stats.challenges_won }}</strong>
-    </div>
-    <div class="profile-detail">
-        <span>Head-to-head record (W–L–T)</span>
-        <strong>{{ stats.challenge_record }} <small>({{ stats.battles }} battle{{ stats.battles|pluralize }})</small></strong>
-    </div>
-</div>
+    <dl class="detail-list">
+        <div><dt>Season record (W–L–T)</dt><dd>{{ stats.season_record }}</dd></div>
+        <div><dt>Season win %</dt><dd>{{ stats.season_pct }}</dd></div>
+        <div><dt>Career record (W–L–T)</dt><dd>{{ stats.career_record }}</dd></div>
+        <div><dt>Career win %</dt><dd>{{ stats.career_pct }}</dd></div>
+        <div><dt>Weeks won</dt><dd>{{ stats.weeks_won }}</dd></div>
+        <div><dt>Seasons won</dt><dd>{{ stats.seasons_won }}</dd></div>
+        <div><dt>Challenges won</dt><dd>{{ stats.challenges_won }}</dd></div>
+        <div><dt>Head-to-head record (W–L–T)</dt><dd>{{ stats.challenge_record }} <small class="muted">({{ stats.battles }} battle{{ stats.battles|pluralize }})</small></dd></div>
+    </dl>
+</section>

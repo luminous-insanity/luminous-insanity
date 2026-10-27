@@ -1,17 +1,16 @@
-<!-- history.html -->
 {% extends 'main/base.html' %}
 
-{% block title %}Pick History{% endblock %}
+{% block title %}Pick history | GameDayPicks{% endblock %}
 
 {% block content %}
-    <h1>Pick History</h1>
-    <table>
+<div class="page-head">
+    <div><h1>Pick history</h1></div>
+</div>
+
+<div class="table-wrap">
+    <table class="table">
         <thead>
-            <tr>
-                <th>Game Date</th>
-                <th>Game</th>
-                <th>Your Pick</th>
-            </tr>
+            <tr><th>Game date</th><th>Game</th><th>Your pick</th></tr>
         </thead>
         <tbody>
             {% for item in game_data %}
@@ -21,10 +20,9 @@
                     <td>{{ item.user_pick }}</td>
                 </tr>
             {% empty %}
-                <tr>
-                    <td colspan="3">No pick history available</td>
-                </tr>
+                <tr><td colspan="3" class="muted">No pick history available</td></tr>
             {% endfor %}
         </tbody>
     </table>
+</div>
 {% endblock %}

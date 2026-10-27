@@ -1,35 +1,33 @@
- {% extends 'main/base.html' %}
+{% extends 'main/base.html' %}
 {% load socialaccount %}
 
+{% block title %}Sign up | GameDayPicks{% endblock %}
+
 {% block content %}
-<div class="auth-container">
+<div class="auth">
+    <h1>Create your account</h1>
+    <p class="muted">Join GameDayPicks and get in the game.</p>
 
-    <h2>Create Your Account</h2>
-    <p>Join GameDayPicks and get in the game.</p>
-
-    <a href="{% provider_login_url 'google' %}"
-       class="google-login-btn">
-        <span class="google-icon">G</span>
-        Continue with Google
-    </a>
-
-    <div class="auth-divider">
-        <span>OR</span>
-    </div>
-
-    <form method="post">
+    {% comment %}
+        A POST form (not a link) goes straight to Google. A plain link makes allauth
+        show its own unstyled "Continue?" confirmation page first.
+    {% endcomment %}
+    <form method="post" action="{% provider_login_url 'google' %}" class="google-form">
         {% csrf_token %}
-        {{ form.as_p }}
-
-        <button type="submit" class="auth-submit-btn">
-            Create Account
+        <button type="submit" class="google-btn">
+            <svg class="google-g" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.2 5.5-4.7 7.2l7.6 5.9c4.4-4.1 6.9-10.1 6.9-17.6z"/><path fill="#FBBC05" d="M10.5 28.7A14.5 14.5 0 019.5 24c0-1.6.3-3.2.8-4.7l-7.9-6.1A24 24 0 000 24c0 3.9.9 7.5 2.6 10.8l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.9 2.3-8.3 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>
+            Continue with Google
         </button>
     </form>
 
-    <p class="auth-signup-link">
-        Already have an account?
-        <a href="{% url 'login' %}">Log in here</a>
-    </p>
+    <div class="auth-divider"><span>or</span></div>
 
+    <form method="post" class="form">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-red btn-block">Create account</button>
+    </form>
+
+    <p class="auth-alt">Already have an account? <a href="{% url 'login' %}">Log in</a></p>
 </div>
 {% endblock %}

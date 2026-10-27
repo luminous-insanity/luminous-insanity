@@ -1,236 +1,94 @@
-<!-- main/templates/main/home.html -->
 {% extends 'main/base.html' %}
 
-{% block title %}Homepage{% endblock %}
+{% block title %}GameDayPicks{% endblock %}
 
 {% block content %}
 
-<section class="home-hero">
-    <div class="hero-content">
-        <p class="hero-eyebrow">YOUR PICKS. YOUR LEAGUE. YOUR BRAGGING RIGHTS.</p>
-
-        <h2>EVERY GAME<br>MATTERS.</h2>
-
-        <p class="hero-description">
-            Pick the winner of every game. Compete with your friends.
-            Climb the leaderboard. Make every game day count.
-        </p>
-
+<section class="hero">
+    {% if user.is_authenticated %}
+        <h1>Welcome back, {{ user.username }}.</h1>
+        <p>Week {{ current_week }} is on the board. Lock in your picks before kickoff.</p>
         <div class="hero-actions">
-            {% if user.is_authenticated %}
-                <a href="{% url 'picks' %}" class="hero-button hero-button-primary">
-                    MAKE YOUR PICKS
-                </a>
-            {% else %}
-                <a href="{% url 'signup' %}" class="hero-button hero-button-primary">
-                    JOIN THE GAME
-                </a>
-            {% endif %}
-
-            <a href="{% url 'leaderboard' %}" class="hero-button hero-button-secondary">
-                VIEW LEADERBOARD
-            </a>
+            <a href="{% url 'picks' %}" class="btn btn-red">Make your picks</a>
+            <a href="{% url 'leaderboard' %}" class="btn btn-quiet">Leaderboard</a>
         </div>
-    </div>
+    {% else %}
+        <h1>Pick every game. Beat your friends.</h1>
+        <p>Choose a winner for each NFL game, climb the weekly leaderboard, and settle who really knows football.</p>
+        <div class="hero-actions">
+            <a href="{% url 'signup' %}" class="btn btn-red">Join for free</a>
+            <a href="{% url 'leaderboard' %}" class="btn btn-quiet">See the leaderboard</a>
+        </div>
+    {% endif %}
 </section>
- <section class="how-it-works">
-    <div class="section-heading">
-        <p class="section-eyebrow">THE GAME PLAN</p>
-        <h2>HOW IT WORKS</h2>
-        <p>Three steps. Every game. One leaderboard.</p>
-    </div>
 
-    <div class="steps-grid">
-        <div class="step-card">
-            <div class="step-number">01</div>
-            <h3>PICK YOUR WINNERS</h3>
-            <p>Make your prediction for every game on the weekly schedule before kickoff.</p>
-        </div>
+{% if not user.is_authenticated %}
+<ol class="steps">
+    <li>Pick winners<span>Choose before each game kicks off.</span></li>
+    <li>Watch the scores<span>Results update as games finish.</span></li>
+    <li>Climb the board<span>Compete weekly and all season.</span></li>
+</ol>
+{% endif %}
 
-        <div class="step-card">
-            <div class="step-number">02</div>
-            <h3>FOLLOW THE ACTION</h3>
-            <p>Every matchup matters when your picks are on the line. Watch the scores roll in.</p>
-        </div>
-
-        <div class="step-card">
-            <div class="step-number">03</div>
-            <h3>CLIMB THE LEADERBOARD</h3>
-            <p>See how your record stacks up against your friends and fight for bragging rights.</p>
-        </div>
-    </div>
-</section>
- <section class="competition-section">
-    <div class="competition-content">
-        <p class="competition-eyebrow">EVERY WEEK IS A NEW CHALLENGE</p>
-
-        <h2>IT'S MORE THAN<br>JUST YOUR TEAM.</h2>
-
-        <p class="competition-description">
-            Pick every matchup and suddenly every game matters.
-            You're cheering for underdogs, sweating out close finishes,
-            and keeping an eye on the competition. One week can change everything.
-        </p>
-
-        <div class="competition-highlights">
-            <div class="competition-highlight">
-                <span class="highlight-number">EVERY</span>
-                <span class="highlight-label">GAME COUNTS</span>
-            </div>
-
-            <div class="competition-highlight">
-                <span class="highlight-number">ONE</span>
-                <span class="highlight-label">WEEKLY RECORD</span>
-            </div>
-
-            <div class="competition-highlight">
-                <span class="highlight-number">ALL</span>
-                <span class="highlight-label">BRAGGING RIGHTS</span>
-            </div>
-        </div>
-
-        <a href="{% url 'leaderboard' %}" class="competition-button">
-            CHECK THE LEADERBOARD →
-        </a>
-    </div>
-</section>
- <section class="featured-games">
-    <div class="featured-games-heading">
-        <div>
-            <p class="section-eyebrow">THE MATCHUPS</p>
-            <h2>WEEK {{ current_week }} PREVIEW</h2>
-            <p>Every matchup is another chance to get your picks right.</p>
-        </div>
-
+<section class="section" aria-labelledby="games-title">
+    <div class="section-head">
+        <h2 id="games-title">Week {{ current_week }} games</h2>
         {% if user.is_authenticated %}
-            <a href="{% url 'picks' %}" class="games-view-all">
-                MAKE YOUR PICKS →
-            </a>
+            <a href="{% url 'picks' %}">Make picks</a>
         {% else %}
-            <a href="{% url 'signup' %}" class="games-view-all">
-                JOIN THE GAME →
-            </a>
+            <a href="{% url 'signup' %}">Join to pick</a>
         {% endif %}
     </div>
 
     {% if featured_games %}
-        <div class="featured-games-grid">
+        <div class="tiles">
             {% for game in featured_games %}
-                <div class="featured-game-card">
-                    <div class="featured-game-top">
-                        <span>WEEK {{ game.week }}</span>
+                <article class="tile">
+                    <div class="tile-meta">
                         <span>
-                            {% if game.is_final %}
-                                FINAL
-                            {% elif game.has_started %}
-                                IN PROGRESS
-                            {% else %}
-                                UPCOMING
-                            {% endif %}
+                            {% if game.kickoff %}{{ game.kickoff|date:"D, M j, g:i A" }}{% else %}{{ game.game_date|date:"D, M j" }}{% endif %}
                         </span>
-                    </div>
-
-                    <div class="featured-team">
-                        <span class="team-label">AWAY</span>
-                        <strong>{{ game.away_team }}</strong>
                         {% if game.is_final %}
-                            <span class="team-score">{{ game.away_score }}</span>
+                            <span class="pill pill-final">Final</span>
+                        {% elif game.has_started %}
+                            <span class="pill pill-live">Live</span>
                         {% endif %}
                     </div>
-
-                    <div class="featured-team">
-                        <span class="team-label">HOME</span>
-                        <strong>{{ game.home_team }}</strong>
-                        {% if game.is_final %}
-                            <span class="team-score">{{ game.home_score }}</span>
-                        {% endif %}
+                    <div class="tile-row {% if game.is_final and game.away_score > game.home_score %}is-winner{% endif %}">
+                        <span class="tile-team">{{ game.away_team }}</span>
+                        {% if game.is_final %}<span class="tile-score has-score">{{ game.away_score }}</span>{% endif %}
                     </div>
-
-                    <div class="featured-game-footer">
-                        {% if game.kickoff %}
-                            {{ game.kickoff|date:"D, M j · g:i A" }}
-                        {% else %}
-                            {{ game.game_date|date:"D, M j" }}
-                        {% endif %}
+                    <div class="tile-row {% if game.is_final and game.home_score > game.away_score %}is-winner{% endif %}">
+                        <span class="tile-team">{{ game.home_team }}</span>
+                        {% if game.is_final %}<span class="tile-score has-score">{{ game.home_score }}</span>{% endif %}
                     </div>
-                </div>
+                </article>
             {% endfor %}
         </div>
     {% else %}
-        <p class="no-featured-games">
-            The schedule isn't available yet. Check back when games are loaded.
-        </p>
+        <p class="empty">The schedule isn't loaded yet. Check back soon.</p>
     {% endif %}
 </section>
- <section class="home-leaderboard">
-    <div class="home-leaderboard-heading">
-        <div>
-            <p class="section-eyebrow">THE RACE FOR THE TOP</p>
-            <h2>LEADERBOARD</h2>
-            <p>Every pick counts. Every win moves you up.</p>
-        </div>
 
-        <a href="{% url 'leaderboard' %}" class="games-view-all">
-            FULL LEADERBOARD →
-        </a>
+<section class="section" aria-labelledby="top-title">
+    <div class="section-head">
+        <h2 id="top-title">Top players</h2>
+        <a href="{% url 'leaderboard' %}">Full leaderboard</a>
     </div>
 
     {% if top_standings %}
-        <div class="home-leaderboard-list">
+        <ol class="rank-list">
             {% for standing in top_standings %}
-                <div class="home-standing-row">
-                    <div class="standing-rank">
-                        {% if forloop.counter == 1 %}
-                            01
-                        {% elif forloop.counter == 2 %}
-                            02
-                        {% else %}
-                            03
-                        {% endif %}
-                    </div>
-
-                    <div class="standing-player">
-                        <strong>{{ standing.user.username }}</strong>
-                        <span>PLAYER</span>
-                    </div>
-
-                    <div class="standing-record">
-                        <strong>{{ standing.wins }}–{{ standing.losses }}–{{ standing.ties }}</strong>
-                        <span>W–L–T</span>
-                    </div>
-                </div>
+                <li class="rank-item">
+                    <span class="rank-num">{{ forloop.counter }}</span>
+                    <span class="rank-name">{{ standing.user.username }}</span>
+                    <span class="rank-record">{{ standing.wins }}–{{ standing.losses }}–{{ standing.ties }}</span>
+                </li>
             {% endfor %}
-        </div>
+        </ol>
     {% else %}
-        <p class="no-featured-games">
-            The leaderboard will appear here when players join the competition.
-        </p>
+        <p class="empty">Standings appear once players start picking.</p>
     {% endif %}
-
-    <div class="leaderboard-bottom-link">
-        <a href="{% url 'leaderboard' %}">VIEW ALL PLAYERS →</a>
-    </div>
 </section>
-{% if user.is_authenticated %}
-<section class="player-welcome">
-    <div class="welcome-message">
-        <p class="welcome-eyebrow">WELCOME BACK TO GAMEDAYPICKS</p>
-        <h2>READY TO MAKE YOUR PICKS, {{ user.username|upper }}?</h2>
-        <p>
-            Every matchup counts. Get your picks in before kickoff
-            and see how you stack up against the competition.
-        </p>
-    </div>
 
-    <div class="welcome-actions">
-        <a href="{% url 'picks' %}" class="welcome-picks-button">
-            MAKE YOUR PICKS →
-        </a>
-
-        <a href="{% url 'leaderboard' %}" class="welcome-leaderboard-link">
-            VIEW LEADERBOARD
-        </a>
-    </div>
-</section>
-{% endif %}
 {% endblock %}

@@ -1,0 +1,15 @@
+{% extends 'main/base.html' %}
+{% block title %}Continuing to {{ provider.name|default:"Google" }} | GameDayPicks{% endblock %}
+{% block content %}
+{# Only reached if something sends a plain link here. Submits itself so nobody has to click. #}
+<div class="auth">
+    <h1>Continuing to {{ provider.name|default:"Google" }}&hellip;</h1>
+    <p class="muted">One moment while we sign you in.</p>
+    <form method="post" id="providerForm" class="form">
+        {% csrf_token %}
+        {% if redirect_field_value %}<input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">{% endif %}
+        <button type="submit" class="btn btn-block">Continue</button>
+    </form>
+</div>
+<script>document.getElementById('providerForm').submit();</script>
+{% endblock %}

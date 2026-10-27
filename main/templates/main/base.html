@@ -1,131 +1,162 @@
-<!DOCTYPE html>
-<html lang="en">
+{% load static %}<!DOCTYPE html>
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}GDP{% endblock %}</title>
-    {% load static %}
-    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
-    <style>
-        .messages { list-style: none; padding: 0; margin: 0 0 15px; }
-        .messages li { padding: 10px 14px; border-radius: 5px; margin-bottom: 6px; background: #e8f0fe; }
-        .messages li.success { background: #e6f4ea; color: #1e5b2f; }
-        .messages li.error { background: #fde8e8; color: #8a1f1f; }
-        .week-nav { margin: 8px 0 14px; }
-        .week-nav a { margin-right: 14px; }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#0a1f44">
+    <title>{% block title %}GameDayPicks{% endblock %}</title>
+    <script>
+        /* Apply the saved theme before first paint so the page never flashes. */
+        (function () {
+            try {
+                if (localStorage.getItem('gdp-theme') === 'dark') {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                }
+            } catch (e) { /* storage blocked: stay on light */ }
+        })();
+    </script>
+    <link rel="stylesheet" href="{% static 'css/theme.css' %}">
 </head>
 <body>
-    <header>
-        <a href="{% url 'home' %}" class="header-link">
-            <h1>GameDayPicks</h1>
-        </a>
-        <div class="header-right">
-            <nav id="site-nav" class="site-nav">
-                <a href="{% url 'home' %}" class="button">Home</a>
-                <a href="{% url 'leaderboard' %}" class="button">Leaderboard</a>
+    <a class="skip-link" href="#main">Skip to content</a>
 
+    {% with page=request.resolver_match.url_name %}
+    <header class="site-header">
+        <div class="site-header-inner">
+            <a href="{% url 'home' %}" class="brand">
+                <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+                    <ellipse cx="16" cy="16" rx="14" ry="8.5" transform="rotate(-35 16 16)" fill="currentColor"/>
+                    <path d="M10.5 21.5l11-11M13 14l3 3M16 11l3 3M10 18l3 3" stroke="#fff" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+                </svg>
+                <span>GameDayPicks</span>
+            </a>
+
+            <nav class="nav-links" aria-label="Main">
                 {% if user.is_authenticated %}
-                    <a href="{% url 'dashboard' %}" class="button">Dashboard</a>
-                    <a href="{% url 'picks' %}" class="button">Make Picks</a>
-                    <a href="{% url 'profile' %}" class="button">Profile</a>
-                    <a href="{% url 'logout' %}" class="button">Logout</a>
+                    <a href="{% url 'picks' %}" {% if page == 'picks' %}aria-current="page"{% endif %}>Picks</a>
+                    <a href="{% url 'leaderboard' %}" {% if page == 'leaderboard' %}aria-current="page"{% endif %}>Leaderboard</a>
+                    <a href="{% url 'dashboard' %}" {% if page == 'dashboard' %}aria-current="page"{% endif %}>Dashboard</a>
                 {% else %}
-                    <a href="{% url 'signup' %}" class="button">Sign Up</a>
-                    <a href="{% url 'login' %}" class="button">Login</a>
+                    <a href="{% url 'leaderboard' %}" {% if page == 'leaderboard' %}aria-current="page"{% endif %}>Leaderboard</a>
                 {% endif %}
             </nav>
+
+            <div class="header-actions">
+                <button type="button" class="icon-btn" id="themeToggle" aria-label="Switch to dark mode" title="Switch theme">
+                    <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 019.5 4 8 8 0 1020 14.5z" fill="currentColor"/></svg>
+                    <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2" fill="currentColor"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                </button>
+
+                {% if user.is_authenticated %}
+                    <details class="account">
+                        <summary aria-label="Account menu">
+                            <span class="avatar" aria-hidden="true">{{ user.username|slice:":1"|upper }}</span>
+                            <span class="account-name">{{ user.username }}</span>
+                        </summary>
+                        <div class="account-panel">
+                            <a href="{% url 'profile' %}">Profile</a>
+                            <a href="{% url 'achievements' %}">Achievements</a>
+                            <a href="{% url 'challenges' %}">Challenges</a>
+                            <a href="{% url 'logout' %}">Log out</a>
+                        </div>
+                    </details>
+                {% else %}
+                    <a href="{% url 'login' %}" class="header-link-quiet">Log in</a>
+                    <a href="{% url 'signup' %}" class="btn btn-red btn-sm">Sign up</a>
+                {% endif %}
+            </div>
         </div>
     </header>
 
-    <!-- Mobile bottom navigation -->
-    <nav class="mobile-bottom-nav" aria-label="Mobile navigation">
+    <nav class="tabbar" aria-label="Main">
         {% if user.is_authenticated %}
-            <a href="{% url 'picks' %}" class="mobile-nav-link">
-                <span class="mobile-nav-icon">🏈</span>
-                <span>My Picks</span>
+            <a href="{% url 'picks' %}" {% if page == 'picks' %}aria-current="page"{% endif %}>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Picks</span>
             </a>
-
-            <a href="{% url 'leaderboard' %}" class="mobile-nav-link">
-                <span class="mobile-nav-icon">🏆</span>
+            <a href="{% url 'leaderboard' %}" {% if page == 'leaderboard' %}aria-current="page"{% endif %}>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20V11M12 20V5M18 20v-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
                 <span>Leaderboard</span>
             </a>
-
-            <a href="{% url 'dashboard' %}" class="mobile-nav-link">
-                <span class="mobile-nav-icon">📊</span>
+            <a href="{% url 'dashboard' %}" {% if page == 'dashboard' %}aria-current="page"{% endif %}>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 20c.8-3.6 3.6-5.4 7-5.4s6.2 1.8 7 5.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
                 <span>Dashboard</span>
             </a>
         {% else %}
-            <a href="{% url 'home' %}" class="mobile-nav-link">
-                <span class="mobile-nav-icon">🏠</span>
+            <a href="{% url 'home' %}" {% if page == 'home' %}aria-current="page"{% endif %}>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-6.5 8 6.5v8.5h-5.5v-5.5h-5v5.5H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
                 <span>Home</span>
             </a>
-
-            <a href="{% url 'leaderboard' %}" class="mobile-nav-link">
-                <span class="mobile-nav-icon">🏆</span>
+            <a href="{% url 'leaderboard' %}" {% if page == 'leaderboard' %}aria-current="page"{% endif %}>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20V11M12 20V5M18 20v-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
                 <span>Leaderboard</span>
             </a>
-
-            <a href="{% url 'login' %}?next={% url 'picks' %}"
-               class="mobile-nav-link">
-                <span class="mobile-nav-icon">🏈</span>
-                <span>Login</span>
+            <a href="{% url 'login' %}?next={% url 'picks' %}" {% if page == 'login' %}aria-current="page"{% endif %}>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Log in</span>
             </a>
-
-            <a href="{% url 'signup' %}" class="mobile-nav-link">
-                <span class="mobile-nav-icon">👤</span>
-                <span>Sign Up</span>
+            <a href="{% url 'signup' %}" {% if page == 'signup' %}aria-current="page"{% endif %}>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 20c.8-3.6 3.6-5.4 7-5.4s6.2 1.8 7 5.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                <span>Sign up</span>
             </a>
         {% endif %}
     </nav>
+    {% endwith %}
 
-
-    <div class="container">
+    <main class="container" id="main">
         {% if messages %}
-            <ul class="messages">
+            <ul class="messages" role="status">
                 {% for message in messages %}<li class="{{ message.tags }}">{{ message }}</li>{% endfor %}
             </ul>
         {% endif %}
         {% block content %}
         {% endblock %}
-    </div>
+    </main>
 
-        <footer class="site-footer">
-            <div class="footer-main">
-                <div class="footer-brand">
-                    <a href="{% url 'home' %}" class="footer-logo">
-                        GAMEDAYPICKS
-                    </a>
-                    <p>
-                        Every game matters. Make your picks, compete with
-                        your friends, and fight for bragging rights.
-                    </p>
-                </div>
+    <footer class="foot">
+        <div class="foot-inner">
+            <p class="foot-brand">GameDayPicks <span>Every game matters.</span></p>
+            <nav class="foot-links" aria-label="Footer">
+                <a href="{% url 'about' %}">About</a>
+                <a href="{% url 'contact' %}">Contact</a>
+                <a href="{% url 'privacy' %}">Privacy</a>
+                <a href="{% url 'terms' %}">Terms</a>
+            </nav>
+            <p class="foot-copy">&copy; {% now "Y" %} GameDayPicks</p>
+        </div>
+    </footer>
 
-                <div class="footer-links">
-                    <h3>EXPLORE</h3>
-                    <a href="{% url 'home' %}">Home</a>
-                    <a href="{% url 'leaderboard' %}">Leaderboard</a>
-                    {% if user.is_authenticated %}
-                        <a href="{% url 'picks' %}">Make Your Picks</a>
-                    {% else %}
-                        <a href="{% url 'signup' %}">Join the Game</a>
-                    {% endif %}
-                </div>
+    <script>
+        (function () {
+            var root = document.documentElement;
+            var button = document.getElementById('themeToggle');
+            if (!button) return;
 
-                <div class="footer-links">
-                    <h3>INFORMATION</h3>
-                    <a href="{% url 'about' %}">About</a>
-                    <a href="{% url 'contact' %}">Contact</a>
-                    <a href="{% url 'privacy' %}">Privacy Policy</a>
-                    <a href="{% url 'terms' %}">Terms of Service</a>
-                </div>
-            </div>
+            function sync() {
+                var dark = root.getAttribute('data-theme') === 'dark';
+                button.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+            }
+            sync();
 
-            <div class="footer-bottom">
-                <p>© {% now "Y" %} GameDayPicks. All rights reserved.</p>
-                <p>Built for the love of the game.</p>
-            </div>
-        </footer>
+            button.addEventListener('click', function () {
+                var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+                root.setAttribute('data-theme', next);
+                try { localStorage.setItem('gdp-theme', next); } catch (e) { /* ignore */ }
+                sync();
+            });
+
+            /* Close the account menu when clicking elsewhere or pressing Escape. */
+            var menu = document.querySelector('.account');
+            if (menu) {
+                document.addEventListener('click', function (e) {
+                    if (!menu.contains(e.target)) menu.removeAttribute('open');
+                });
+                document.addEventListener('keydown', function (e) {
+                    if (e.key === 'Escape') menu.removeAttribute('open');
+                });
+            }
+        })();
+    </script>
 </body>
 </html>

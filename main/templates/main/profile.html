@@ -1,80 +1,34 @@
 {% extends 'main/base.html' %}
 
-{% block title %}My Profile | GameDayPicks{% endblock %}
+{% block title %}My profile | GameDayPicks{% endblock %}
 
 {% block content %}
-<section class="profile-page">
+<div class="narrow">
 
-    <div class="profile-heading">
-        <p class="profile-eyebrow">YOUR GAMEDAYPICKS ACCOUNT</p>
-        <h2>MY PROFILE</h2>
-        <p>Manage your account and track your journey.</p>
-    </div>
-
-    <div class="profile-overview">
-        <div class="profile-avatar">
-            {{ user.username|first|upper }}
-        </div>
-
-        <div class="profile-identity">
-            <h3>{{ user.username }}</h3>
-            <p>GameDayPicks Member</p>
-        </div>
-
-        <div class="profile-status">
-            <span class="status-dot"></span>
-            ACTIVE ACCOUNT
+    <div class="person">
+        <span class="person-avatar" aria-hidden="true">{{ user.username|first|upper }}</span>
+        <div>
+            <h1>{{ user.username }}</h1>
+            <p class="muted">Member since {{ user.date_joined|date:"F Y" }}</p>
         </div>
     </div>
 
-    <div class="profile-card">
-        <div class="profile-card-heading">
-            <div>
-                <p class="profile-card-eyebrow">ACCOUNT DETAILS</p>
-                <h3>Account Information</h3>
-            </div>
-            <span class="profile-card-icon">👤</span>
-        </div>
+    <section class="card detail-card">
+        <div class="detail-card-head"><h2>Account</h2></div>
+        <dl class="detail-list">
+            <div><dt>Username</dt><dd>{{ user.username }}</dd></div>
+            <div><dt>Email address</dt><dd>{{ user.email|default:"Not provided" }}</dd></div>
+            <div><dt>Member since</dt><dd>{{ user.date_joined|date:"F Y" }}</dd></div>
+        </dl>
+    </section>
 
-        <div class="profile-detail">
-            <span>Username</span>
-            <strong>{{ user.username }}</strong>
-        </div>
-
-        <div class="profile-detail">
-            <span>Email Address</span>
-            <strong>{{ user.email|default:"Not provided" }}</strong>
-        </div>
-
-        <div class="profile-detail">
-            <span>Member Since</span>
-            <strong>{{ user.date_joined|date:"F Y" }}</strong>
-        </div>
-    </div>
-
-    {% with stats_label=stats_season|stringformat:"s"|add:" SEASON & CAREER" %}
+    {% with stats_label=stats_season|stringformat:"s"|add:" season & career" %}
         {% include 'main/_stats_card.html' %}
     {% endwith %}
 
-    <div class="profile-future">
-        <div class="profile-future-icon">🏈</div>
-        <div>
-            <h3>MAKE IT YOUR GAMEDAY</h3>
-            <p>
-                Favorite-team themes and more profile customization
-                are future features we're working toward.
-            </p>
-        </div>
+    <div class="button-row">
+        <a href="{% url 'dashboard' %}" class="btn">Go to dashboard</a>
+        <a href="{% url 'history' %}" class="btn btn-quiet">Pick history</a>
     </div>
-
-    <div class="profile-actions">
-        <a href="{% url 'dashboard' %}" class="profile-primary-button">
-            GO TO DASHBOARD →
-        </a>
-        <a href="{% url 'history' %}" class="profile-secondary-button">
-            VIEW PICK HISTORY
-        </a>
-    </div>
-
-</section>
+</div>
 {% endblock %}

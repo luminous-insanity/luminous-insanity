@@ -4,191 +4,139 @@
 {% block title %}Leaderboard | GameDayPicks{% endblock %}
 
 {% block content %}
-<section class="home-leaderboard">
 
-    <div class="home-leaderboard-heading">
-        <div>
-            <p class="section-eyebrow">THE RACE FOR THE TOP</p>
-            <h2>LEADERBOARD</h2>
-            <p>Every pick counts. Every win moves you up.</p>
-        </div>
+<div class="page-head">
+    <div>
+        <h1>Leaderboard</h1>
+        <p>{{ selected_season }} season</p>
     </div>
 
-    <!-- Weekly / Season tabs -->
-    <div class="lb-tabs" role="tablist" aria-label="Leaderboard view">
-        <a href="{{ weekly_url }}" role="tab" class="lb-tab{% if tab == 'weekly' %} is-active{% endif %}"
+    <div class="seg" role="tablist" aria-label="Leaderboard view">
+        <a href="{{ weekly_url }}" role="tab" class="{% if tab == 'weekly' %}is-active{% endif %}"
            aria-selected="{% if tab == 'weekly' %}true{% else %}false{% endif %}">Weekly</a>
-        <a href="{{ season_url }}" role="tab" class="lb-tab{% if tab == 'season' %} is-active{% endif %}"
+        <a href="{{ season_url }}" role="tab" class="{% if tab == 'season' %}is-active{% endif %}"
            aria-selected="{% if tab == 'season' %}true{% else %}false{% endif %}">Season</a>
     </div>
+</div>
 
-    <!-- Season selector (both tabs) -->
-    <form method="get" class="leaderboard-filter">
+<div class="lb-controls">
+    <form method="get" class="inline-form">
         <input type="hidden" name="tab" value="{{ tab }}">
-        <div class="leaderboard-filter-group">
-            <label for="season">Season:</label>
-            <select name="season" id="season" onchange="this.form.submit()">
-                {% for season in seasons %}
-                    <option value="{{ season }}"
-                        {% if selected_season == season %}selected{% endif %}>
-                        {{ season }} Season
-                    </option>
-                {% endfor %}
-            </select>
-        </div>
-        <noscript><button type="submit">Show Standings</button></noscript>
+        <label for="season" class="visually-hidden">Season</label>
+        <select name="season" id="season" onchange="this.form.submit()">
+            {% for season in seasons %}
+                <option value="{{ season }}" {% if selected_season == season %}selected{% endif %}>{{ season }} season</option>
+            {% endfor %}
+        </select>
+        <noscript><button type="submit" class="btn btn-sm">Show</button></noscript>
     </form>
 
-    <!-- Week navigation (Weekly tab only) -->
     {% if tab == 'weekly' %}
-        <form method="get" class="lb-week-nav" aria-label="Choose a week">
+        <form method="get" class="stepper" aria-label="Choose a week">
             <input type="hidden" name="tab" value="weekly">
             <input type="hidden" name="season" value="{{ selected_season }}">
 
             {% if prev_url %}
-                <a href="{{ prev_url }}" class="lb-week-arrow" aria-label="Previous week" rel="prev">‹</a>
+                <a href="{{ prev_url }}" class="stepper-btn" aria-label="Previous week" rel="prev">&lsaquo;</a>
             {% else %}
-                <span class="lb-week-arrow is-disabled" aria-disabled="true" aria-label="No earlier week">‹</span>
+                <span class="stepper-btn is-disabled" aria-hidden="true">&lsaquo;</span>
             {% endif %}
 
             <label for="week" class="visually-hidden">Week</label>
             <select name="week" id="week" onchange="this.form.submit()">
                 {% for week in weeks %}
-                    <option value="{{ week }}"
-                        {% if selected_week == week %}selected{% endif %}>
-                        Week {{ week }}
-                    </option>
+                    <option value="{{ week }}" {% if selected_week == week %}selected{% endif %}>Week {{ week }}</option>
                 {% endfor %}
             </select>
 
             {% if next_url %}
-                <a href="{{ next_url }}" class="lb-week-arrow" aria-label="Next week" rel="next">›</a>
+                <a href="{{ next_url }}" class="stepper-btn" aria-label="Next week" rel="next">&rsaquo;</a>
             {% else %}
-                <span class="lb-week-arrow is-disabled" aria-disabled="true" aria-label="No later week">›</span>
+                <span class="stepper-btn is-disabled" aria-hidden="true">&rsaquo;</span>
             {% endif %}
-            <noscript><button type="submit">Go</button></noscript>
+            <noscript><button type="submit" class="btn btn-sm">Go</button></noscript>
         </form>
     {% endif %}
 
-    <!-- All Players / Friends -->
-    <div class="lb-filter-pills" role="group" aria-label="Who to show">
-        <a href="{{ all_url }}" class="lb-pill{% if filter_mode == 'all' %} is-active{% endif %}"
-           {% if filter_mode == 'all' %}aria-current="true"{% endif %}>All Players</a>
-        <a href="{{ friends_url }}" class="lb-pill{% if filter_mode == 'friends' %} is-active{% endif %}"
+    <div class="seg" role="group" aria-label="Who to show">
+        <a href="{{ all_url }}" class="{% if filter_mode == 'all' %}is-active{% endif %}"
+           {% if filter_mode == 'all' %}aria-current="true"{% endif %}>Everyone</a>
+        <a href="{{ friends_url }}" class="{% if filter_mode == 'friends' %}is-active{% endif %}"
            {% if filter_mode == 'friends' %}aria-current="true"{% endif %}>Friends</a>
-        {% if champion %}
-            <button type="button" class="lb-champion-replay" data-champion-open>🏆 View Season Champion</button>
-        {% endif %}
     </div>
 
-    <!-- Season champion spotlight (Season tab, once the season is finalized) -->
-    {% if tab == 'season' and champion %}
-        <section class="champion-spotlight" aria-label="{{ champion.season }} season champion">
-            <div class="champion-trophy" aria-hidden="true">🏆</div>
-            <p class="champion-eyebrow">
-                {{ champion.season }} SEASON CHAMPION{% if champion.co_champions %}S{% endif %}
-            </p>
-            {% for c in champion.champions %}
-                <h3 class="champion-name">{{ c.username }}</h3>
-                <p class="champion-record">{{ c.record }} <span>·</span> {{ c.pct }}</p>
-            {% endfor %}
-            {% if champion.co_champions %}
-                <p class="champion-note">Tied at the top, so they share the title.</p>
-            {% endif %}
-        </section>
+    {% if champion %}
+        <button type="button" class="btn btn-quiet btn-sm" data-champion-open>🏆 Season champion</button>
     {% endif %}
+</div>
 
-    <!-- Weekly winner banner -->
-    {% if tab == 'weekly' and winners %}
-        <section class="week-winner-banner" aria-label="Week {{ selected_week }} {{ winner_label|lower }}">
-            <p class="winner-eyebrow">
-                WEEK {{ selected_week }} {{ winner_label }}{% if winners|length > 1 %}S · TIED{% endif %}{% if filter_mode == 'friends' %} · AMONG FRIENDS{% endif %}
-            </p>
-            <div class="winner-list">
-                {% for w in winners %}
-                    <div class="winner-item">
-                        <span class="winner-name"><span class="winner-crown" aria-hidden="true">👑</span> {{ w.user.username }}</span>
-                        <span class="winner-record">{{ w.wins }}–{{ w.losses }}–{{ w.ties }}</span>
-                    </div>
-                {% endfor %}
-            </div>
-        </section>
-    {% endif %}
+{% if tab == 'season' and champion %}
+    <section class="champion-spotlight" aria-label="{{ champion.season }} season champion">
+        <div class="champion-trophy" aria-hidden="true">🏆</div>
+        <p class="champion-eyebrow">{{ champion.season }} season champion{% if champion.co_champions %}s{% endif %}</p>
+        {% for c in champion.champions %}
+            <h3 class="champion-name">{{ c.username }}</h3>
+            <p class="champion-record">{{ c.record }} <span>·</span> {{ c.pct }}</p>
+        {% endfor %}
+        {% if champion.co_champions %}
+            <p class="champion-note">Tied at the top, so they share the title.</p>
+        {% endif %}
+    </section>
+{% endif %}
 
-    {% if tab == 'season' %}
-        <h3 class="leaderboard-subheading">{{ selected_season }} Season Standings</h3>
-    {% else %}
-        <h3 class="leaderboard-subheading">
-            {{ selected_season }} Season — Week {{ selected_week }}
-        </h3>
-    {% endif %}
-
-    {% if needs_login %}
-        <div class="home-leaderboard-list">
-            <p class="no-featured-games">
-                <a href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}">Log in</a>
-                to compete with your friends.
+{% if tab == 'weekly' and winners %}
+    <section class="winner-card" aria-label="Week {{ selected_week }} {{ winner_label|lower }}">
+        <span class="winner-crown" aria-hidden="true">👑</span>
+        <div>
+            <p class="winner-title">Week {{ selected_week }} {{ winner_label|lower }}{% if winners|length > 1 %}s (tied){% endif %}{% if filter_mode == 'friends' %} among friends{% endif %}</p>
+            <p class="winner-names">
+                {% for w in winners %}<strong>{{ w.user.username }}</strong> <span>{{ w.wins }}–{{ w.losses }}–{{ w.ties }}</span>{% if not forloop.last %}, {% endif %}{% endfor %}
             </p>
         </div>
-    {% elif friends_empty %}
-        <div class="home-leaderboard-list">
-            <div class="no-featured-games lb-empty-friends">
-                <p>Add friends to start your own competition</p>
-                <a href="{% url 'dashboard' %}?friends=find" class="lb-find-friends">Find Friends</a>
-            </div>
-        </div>
-    {% elif user_stats %}
-        <div class="home-leaderboard-list">
-            {% for standing in user_stats %}
+    </section>
+{% endif %}
+
+{% if needs_login %}
+    <p class="empty"><a href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}">Log in</a> to compete with your friends.</p>
+{% elif friends_empty %}
+    <div class="empty">
+        <p>Add friends to start your own competition.</p>
+        <a href="{% url 'dashboard' %}?friends=find" class="btn btn-sm">Find friends</a>
+    </div>
+{% elif user_stats %}
+    <ol class="lb-list">
+        {% for standing in user_stats %}
+            <li>
                 <button type="button"
-                        class="home-standing-row lb-row{% if standing.is_me %} is-me{% endif %}"
+                        class="lb-item{% if standing.is_me %} is-me{% endif %}"
                         aria-haspopup="dialog"
                         {% include 'main/_menu_attrs.html' with m=standing.menu %}
                         data-reaction-url="{{ standing.reaction_url }}" data-reaction-season="{{ selected_season }}" data-reaction-week="{{ selected_week }}" data-reaction-allowed="{% if standing.can_react %}1{% else %}0{% endif %}" data-reaction-current="{{ standing.my_reaction.emoji|default:'' }}" data-reaction-clap="{{ standing.reaction_clap|default:0 }}" data-reaction-fire="{{ standing.reaction_fire|default:0 }}" data-reaction-crown="{{ standing.reaction_crown|default:0 }}">
 
-                    <div class="standing-rank">
-                        {{ standing.rank|stringformat:"02d" }}
+                    <span class="lb-rank">
+                        {{ standing.rank }}
                         {% if tab == 'weekly' %}
-                            <span class="rank-move rank-{{ standing.movement_kind }}"
-                                  aria-label="Rank change: {{ standing.movement_label }}">{{ standing.movement_label }}</span>
+                            <span class="rank-move rank-{{ standing.movement_kind }}" aria-label="Rank change: {{ standing.movement_label }}">{{ standing.movement_label }}</span>
                         {% endif %}
-                    </div>
+                    </span>
 
-                    <div class="standing-player">
-                        <strong>{{ standing.user.username }}{% if standing.is_me %} <em class="you-tag">YOU</em>{% endif %}</strong>
-                        <span>PLAYER</span>
-                    </div>
+                    <span class="lb-name">{{ standing.user.username }}{% if standing.is_me %} <em class="you-tag">You</em>{% endif %}</span>
 
-                    <div class="standing-record">
+                    <span class="lb-record">
                         <strong>{{ standing.wins }}–{{ standing.losses }}–{{ standing.ties }}</strong>
                         {% if tab == 'season' %}
-                            <span>{{ standing.menu.season_pct }}</span>
+                            <small>{{ standing.menu.season_pct }}</small>
                         {% elif standing.pending %}
-                            <span>{{ standing.pending }} PENDING</span>
-                        {% else %}
-                            <span>W–L–T</span>
+                            <small>{{ standing.pending }} pending</small>
                         {% endif %}
-                    </div>
-
+                    </span>
                 </button>
-
-            {% endfor %}
-        </div>
-    {% else %}
-        <div class="home-leaderboard-list">
-            <p class="no-featured-games">
-                No standings are available for this selection yet.
-            </p>
-        </div>
-    {% endif %}
-
-    <div class="leaderboard-bottom-link">
-        <a href="{% url 'dashboard' %}?season={{ selected_season }}">
-            BACK TO DASHBOARD →
-        </a>
-    </div>
-
-</section>
+            </li>
+        {% endfor %}
+    </ol>
+{% else %}
+    <p class="empty">No standings for this selection yet.</p>
+{% endif %}
 
 {% include 'main/_player_menu.html' %}
 

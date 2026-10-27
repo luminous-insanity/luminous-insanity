@@ -274,7 +274,7 @@ class DashboardAndPagesTests(TestCase):
 
     def test_dashboard_shows_the_expanded_stats(self):
         response = self.client.get(reverse("dashboard"))
-        for label in ("Weeks Won", "Seasons Won", "Career Win %", "Challenges Won", "Head-to-Head"):
+        for label in ("Weeks won", "Seasons won", "Career win rate", "Challenges won", "Head-to-head"):
             self.assertContains(response, label)
         self.assertIn("weeks_won", response.context["my_stats"])
 
