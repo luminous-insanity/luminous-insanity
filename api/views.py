@@ -15,14 +15,17 @@ log = logging.getLogger(__name__)
 @csrf_exempt
 def sync_view(request):
     """
-    Called by an outside scheduler (e.g. cron-job.org) every ~30 minutes:
+    Called by an outside scheduler (e.g. cron-job.org) every ~30 minutes.
+    The token goes in a request header, never in the URL, because URLs end up
+    in server logs and scheduler job histories:
 
-        https://YOUR-SITE/api/sync/?token=YOUR_SYNC_TOKEN
+        https://YOUR-SITE/api/sync/
+        X-Sync-Token: YOUR_SYNC_TOKEN
 
     Safe to call as often as you like: it only spends API calls when a game
     has started and isn't final yet. Anyone without the token gets a 403.
     """
-    given = request.headers.get('X-Sync-Token') or request.GET.get('token', '')
+    given = request.headers.get('X-Sync-Token', '')
     expected = settings.SYNC_TOKEN
     if not expected or not hmac.compare_digest(given.encode(), expected.encode()):
         return HttpResponseForbidden('Forbidden')

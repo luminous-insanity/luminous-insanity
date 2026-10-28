@@ -1,0 +1,105 @@
+{% extends 'main/base.html' %}
+
+{% block title %}Division Wars | GameDayPicks{% endblock %}
+
+{% block content %}
+<div class="page-head division-page-head">
+    <div>
+        <p class="eyebrow">THE ROAD TO THE PLAYOFFS</p>
+        <h1>Division Wars</h1>
+        <p>{{ selected_season }} season · {{ member_count }} player{{ member_count|pluralize }} in {{ selected_division }}</p>
+        {% if tab == 'season' and playoff_race %}
+        <p class="muted">Top {{ playoff_race.qualifiers_per_division }} qualify automatically + 1 winning-percentage wildcard · {% if playoff_race.season_complete %}Qualification final{% else %}Qualification provisional{% endif %}</p>
+        {% endif %}
+    </div>
+    <div class="seg" role="tablist" aria-label="Division standings view">
+        <a href="?division={{ selected_division|urlencode }}&tab=season" role="tab" class="{% if tab == 'season' %}is-active{% endif %}" aria-selected="{% if tab == 'season' %}true{% else %}false{% endif %}">Season race</a>
+        <a href="?division={{ selected_division|urlencode }}&tab=weekly&week={{ selected_week }}" role="tab" class="{% if tab == 'weekly' %}is-active{% endif %}" aria-selected="{% if tab == 'weekly' %}true{% else %}false{% endif %}">Weekly race</a>
+    </div>
+</div>
+
+<section class="division-hero card">
+    <div class="division-hero-mark" aria-hidden="true">🏈</div>
+    <div>
+        <p class="eyebrow">YOUR DIVISION. YOUR RACE.</p>
+        <h2>{{ selected_division }}</h2>
+        {% if my_division == selected_division %}
+            <p>You are racing in this division. Every completed pick can move you up the table.</p>
+        {% elif my_division %}
+            <p>Your season division is <strong>{{ my_division }}</strong>. You can explore every division, but your membership stays locked for the season.</p>
+        {% else %}
+            <p>Choose a favorite NFL team in your <a href="{% url 'profile' %}">profile</a> to join your season division.</p>
+        {% endif %}
+    </div>
+</section>
+
+<div class="division-controls">
+    <form method="get" class="inline-form">
+        <input type="hidden" name="tab" value="{{ tab }}">
+        {% if tab == 'weekly' %}<input type="hidden" name="week" value="{{ selected_week }}">{% endif %}
+        <label for="division-select" class="visually-hidden">Choose division</label>
+        <select id="division-select" name="division" onchange="this.form.submit()">
+            {% for item in division_choices %}<option value="{{ item }}" {% if item == selected_division %}selected{% endif %}>{{ item }}</option>{% endfor %}
+        </select>
+        <noscript><button class="btn btn-sm" type="submit">View division</button></noscript>
+    </form>
+    {% if tab == 'weekly' %}
+    <form method="get" class="inline-form">
+        <input type="hidden" name="tab" value="weekly"><input type="hidden" name="division" value="{{ selected_division }}">
+        <label for="division-week" class="visually-hidden">Choose week</label>
+        <select id="division-week" name="week" onchange="this.form.submit()">
+            {% for week in weeks %}<option value="{{ week }}" {% if week == selected_week %}selected{% endif %}>Week {{ week }}</option>{% endfor %}
+        </select>
+        <noscript><button class="btn btn-sm" type="submit">Go</button></noscript>
+    </form>
+    {% endif %}
+</div>
+
+{% if tab == 'season' and playoff_race %}
+<section class="card" style="padding:14px;margin:14px 0;">
+    <p class="eyebrow">PLAYOFF CUTOFF</p>
+    <strong>Top {{ playoff_race.qualifiers_per_division }} qualify automatically, plus one division winning-percentage wildcard.</strong>
+    {% if playoff_race.season_complete %}
+    <p class="muted" style="margin:6px 0 0;">The regular-season results are complete. Qualification is final.</p>
+    {% else %}
+    <p class="muted" style="margin:6px 0 0;">This race is provisional while games remain unfinished. Pending picks are not counted as losses.</p>
+    {% endif %}
+</section>
+{% endif %}
+
+{% if standings %}
+<ol class="lb-list division-list">
+    {% for standing in standings %}
+    <li class="division-standing-row{% if request.user.is_authenticated and standing.user.id == request.user.id %} is-me{% endif %}{% if tab == 'season' and standing.at_cutoff %} playoff-cutoff{% endif %}">
+        <span class="lb-rank">{% if forloop.counter == 1 %}👑{% else %}{{ standing.rank }}{% endif %}</span>
+        <div class="division-player">
+            <strong>{{ standing.user.username }}</strong>
+            {% if request.user.is_authenticated and standing.user.id == request.user.id %}<span class="you-label">YOU</span>{% endif %}
+            <span class="muted">{{ standing.completed }} completed pick{{ standing.completed|pluralize }}{% if tab == 'season' %} · {{ standing.pending }} pending{% endif %}</span>
+            {% if tab == 'season' %}
+                {% if standing.playoff_qualified %}<span class="you-label">{% if playoff_race.season_complete %}PLAYOFF SPOT{% else %}IN PLAYOFF POSITION{% endif %}</span>{% if standing.division_wildcard %}<span class="muted">Division winning-percentage wildcard</span>{% elif standing.qualification_route %}<span class="muted">{{ standing.qualification_route }}</span>{% endif %}
+                {% else %}<span class="muted">{{ standing.distance_from_cutoff }} place{{ standing.distance_from_cutoff|pluralize }} outside cutoff</span>{% endif %}
+                {% if request.user.is_authenticated and standing.user.id == request.user.id and not standing.playoff_qualified %}
+                    {% if standing.players_ahead %}<span class="muted">Chasing: {% for chased in standing.players_ahead|slice:":3" %}{{ chased.user.username }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>{% endif %}
+                {% endif %}
+            {% endif %}
+        </div>
+        <div class="division-record">
+            <strong>{{ standing.wins }}–{{ standing.losses }}–{{ standing.ties }}</strong>
+            <span class="muted">W–L–T</span>
+        </div>
+    </li>
+    {% endfor %}
+</ol>
+{% if tab == 'season' %}<p class="division-footnote">The cutoff line marks the automatic division cutoff. One additional player can qualify through the division winning-percentage wildcard. League-wide head-to-head wildcards are shown on the championship page.</p>{% endif %}
+{% else %}
+<div class="empty division-empty">
+    <div class="division-empty-icon" aria-hidden="true">🏟️</div>
+    <h2>This division is waiting for its first players.</h2>
+    <p>Players join a division by choosing a favorite NFL team in their profile. Once they join, their records will appear here automatically.</p>
+    {% if user.is_authenticated %}<a href="{% url 'profile' %}" class="btn">Choose your favorite team</a>{% else %}<a href="{% url 'signup' %}" class="btn">Join GameDayPicks</a>{% endif %}
+</div>
+{% endif %}
+
+<p class="division-footnote">Standings use existing picks and finalized game scores. Tied players share a rank; players tied at the qualification cutoff remain in playoff position. Qualification is provisional until all scheduled season games are final.</p>
+{% endblock %}

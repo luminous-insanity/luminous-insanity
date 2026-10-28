@@ -68,10 +68,12 @@ Needs `NFL_API_KEY` and `SYNC_TOKEN` saved in `.env`.
 9. Browse weeks: on the dashboard use Previous week / Next week / This week.
    PASS: the heading and games change; This week brings you back.
 
-10. Test the sync URL (use your real SYNC_TOKEN):
-    - http://127.0.0.1:8000/api/sync/            PASS: "Forbidden"
-    - http://127.0.0.1:8000/api/sync/?token=wrong   PASS: "Forbidden"
-    - http://127.0.0.1:8000/api/sync/?token=YOUR_TOKEN   PASS: a short JSON report with "ok": true
+10. Test the sync URL. The token is sent as a header, which a browser can't do, so use
+    curl (on Windows PowerShell use `curl.exe`). Use your real SYNC_TOKEN:
+    - curl.exe http://127.0.0.1:8000/api/sync/                                  PASS: "Forbidden"
+    - curl.exe -H "X-Sync-Token: wrong" http://127.0.0.1:8000/api/sync/         PASS: "Forbidden"
+    - curl.exe "http://127.0.0.1:8000/api/sync/?token=YOUR_TOKEN"               PASS: "Forbidden" (URL tokens are no longer accepted)
+    - curl.exe -H "X-Sync-Token: YOUR_TOKEN" http://127.0.0.1:8000/api/sync/    PASS: a short JSON report with "ok": true
 
 11. Check your pick history page. PASS: it lists your picks.
 

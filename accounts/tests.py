@@ -13,7 +13,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from accounts.forms import USERNAME_MAX_LENGTH, USERNAME_MIN_LENGTH, SignUpForm
-from accounts.models import Pick
+from accounts.models import Pick, FriendRequest
 from accounts.standings import compute_standings, standing_for
 from accounts.views import get_kickoff_label
 from api.helpers_for_tests import make_final, make_game
@@ -162,6 +162,35 @@ class DashboardTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, 'name="team_picked"')
 
+    def test_dashboard_shows_weekly_showdown_empty_state_without_friends(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context["weekly_race_has_friends"])
+        self.assertContains(response, "THE FRIENDS SHOWDOWN")
+        self.assertContains(response, "Your rivals are waiting.")
+
+    @patch("accounts.views.current_week", return_value=1)
+    def test_dashboard_weekly_showdown_ranks_friends_by_week_record(self, _current_week):
+        rival = make_user("rival")
+        FriendRequest.objects.create(
+            sender=self.user,
+            receiver=rival,
+            status=FriendRequest.ACCEPTED,
+        )
+        game = make_final(make_game(), 24, 10)
+        Pick.objects.create(user=self.user, game=game, team_picked="home")
+        Pick.objects.create(user=rival, game=game, team_picked="away")
+
+        response = self.client.get(self.url)
+
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["weekly_race_has_friends"])
+        self.assertEqual(response.context["weekly_race_my_row"].rank, 1)
+        self.assertEqual(response.context["weekly_race_rows"][1].user, rival)
+        self.assertContains(response, "Full race")
+
 
 # ------------------------------------------------------------ kickoff label --
 
@@ -264,6 +293,30 @@ class MakePickTests(TestCase):
         self.assertContains(response, "Pick changed for")
         self.assertEqual(Pick.objects.count(), 1)
         self.assertEqual(Pick.objects.get().team_picked, "away")
+
+    def test_friend_pulse_reveals_after_kickoff_only(self):
+        friend = make_user("bob")
+        game = make_game(kickoff=ago(1))
+        FriendRequest.objects.create(sender=self.user, receiver=friend, status=FriendRequest.ACCEPTED)
+        Pick.objects.create(user=self.user, game=game, team_picked="home")
+        Pick.objects.create(user=friend, game=game, team_picked="away")
+
+        response = self.client.get(reverse("picks"), {"season": 2026, "week": 1})
+        item = next(row for row in response.context["game_data"] if row["game"].pk == game.pk)
+        self.assertEqual(item["friend_pulse"]["kind"], "contrarian")
+        self.assertContains(response, "You went against the group")
+
+    def test_friend_pulse_does_not_reveal_before_kickoff(self):
+        friend = make_user("bob")
+        game = make_game()
+        FriendRequest.objects.create(sender=self.user, receiver=friend, status=FriendRequest.ACCEPTED)
+        Pick.objects.create(user=self.user, game=game, team_picked="home")
+        Pick.objects.create(user=friend, game=game, team_picked="away")
+
+        response = self.client.get(reverse("picks"), {"season": 2026, "week": 1})
+        item = next(row for row in response.context["game_data"] if row["game"].pk == game.pk)
+        self.assertIsNone(item["friend_pulse"])
+        self.assertNotContains(response, "You went against the group")
 
     def test_a_pick_cannot_be_changed_after_kickoff(self):
         game = make_game()

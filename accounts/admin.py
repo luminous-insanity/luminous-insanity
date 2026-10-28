@@ -20,3 +20,35 @@ class AchievementUnlockAdmin(admin.ModelAdmin):
     list_display = ('user', 'achievement_key', 'level', 'unlocked_at')
     list_filter = ('achievement_key', 'level')
     search_fields = ('user__username', 'achievement_key')
+
+from .models import BoardSquare, PlayoffEntry, PlayoffSettings, SquaresBoard
+
+@admin.register(PlayoffSettings)
+class PlayoffSettingsAdmin(admin.ModelAdmin):
+    list_display = ('season', 'qualifiers_per_division', 'qualifier_percent',
+                    'head_to_head_wildcard_spots', 'field_target', 'first_playoff_week', 'rounds_cut')
+    list_editable = ('qualifiers_per_division', 'qualifier_percent',
+                     'head_to_head_wildcard_spots', 'field_target', 'first_playoff_week')
+    readonly_fields = ('rounds_cut',)
+    ordering = ('-season',)
+
+
+@admin.register(PlayoffEntry)
+class PlayoffEntryAdmin(admin.ModelAdmin):
+    list_display = ('user', 'season', 'status', 'eliminated_round', 'route', 'division')
+    list_filter = ('season', 'status', 'eliminated_round', 'division')
+    search_fields = ('user__username',)
+
+
+@admin.register(SquaresBoard)
+class SquaresBoardAdmin(admin.ModelAdmin):
+    list_display = ('season', 'game', 'home_digits', 'away_digits', 'created_at')
+    readonly_fields = ('home_digits', 'away_digits', 'created_at')
+
+
+@admin.register(BoardSquare)
+class BoardSquareAdmin(admin.ModelAdmin):
+    list_display = ('board', 'row', 'col', 'owner')
+    list_filter = ('board',)
+    search_fields = ('owner__username',)
+

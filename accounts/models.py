@@ -203,3 +203,140 @@ class PerformanceReaction(models.Model):
 
     def __str__(self):
         return f'{self.reactor} reacted {self.emoji} to {self.player} (S{self.season} W{self.week})'
+
+
+class PlayerIdentity(models.Model):
+    """Player-controlled favorite team plus the division locked for a season.
+
+    Favorite team can change at any time. Division membership is snapshotted for
+    the configured NFL season and refreshed from the current favorite team when
+    a new season is first visited/selected.
+    """
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name='player_identity'
+    )
+    favorite_team = models.CharField(max_length=3, blank=True, default='')
+    division = models.CharField(max_length=12, blank=True, default='')
+    division_season = models.PositiveSmallIntegerField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name_plural = 'player identities'
+
+    def __str__(self):
+        return f'{self.user} identity'
+
+
+class PlayoffSettings(models.Model):
+    """Per-season playoff format; editable by site staff in Django admin."""
+    season = models.PositiveSmallIntegerField(unique=True)
+    qualifiers_per_division = models.PositiveSmallIntegerField(default=4)
+    head_to_head_wildcard_spots = models.PositiveSmallIntegerField(default=2)
+    # 0 = use the fixed number above; 1-100 = that share of each division
+    # (rounded, at least one player per division).
+    qualifier_percent = models.PositiveSmallIntegerField(default=0)
+    # The Super Bowl field the weekly cuts step down to.
+    field_target = models.PositiveSmallIntegerField(default=50)
+    # Game.week of the Wild Card round. Divisional, Conference and the Super
+    # Bowl follow in the next three weeks.
+    first_playoff_week = models.PositiveSmallIntegerField(default=19)
+    # How many weekly cuts have been applied (0-3). Managed by the cut command.
+    rounds_cut = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        verbose_name = 'playoff settings'
+        verbose_name_plural = 'playoff settings'
+
+    def __str__(self):
+        return f'{self.season} playoff format ({self.qualifiers_per_division} automatic per division)' 
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.qualifiers_per_division < 1:
+            raise ValidationError({'qualifiers_per_division': 'At least one player must qualify automatically per division.'})
+        if self.head_to_head_wildcard_spots < 0:
+            raise ValidationError({'head_to_head_wildcard_spots': 'Wildcard spots cannot be negative.'})
+        if self.qualifier_percent > 100:
+            raise ValidationError({'qualifier_percent': 'Use 0 (fixed number) or a percentage from 1 to 100.'})
+        if self.field_target < 2:
+            raise ValidationError({'field_target': 'The Super Bowl field needs at least 2 players.'})
+        if self.first_playoff_week < 1:
+            raise ValidationError({'first_playoff_week': 'Enter the week number of the Wild Card round.'})
+
+
+class PlayoffEntry(models.Model):
+    """One player's place in a season's playoff field.
+
+    Created once, when the field is opened. Playoff records are NOT stored:
+    like the leaderboard they are worked out from picks and final scores
+    (see accounts/playoff_rounds.py). Only the facts needed for tiebreaks are
+    frozen here, so a late score fix can't quietly reshuffle who got in.
+    """
+    ACTIVE = 'active'
+    ELIMINATED = 'eliminated'
+    STATUS_CHOICES = [(ACTIVE, 'Active'), (ELIMINATED, 'Eliminated')]
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='playoff_entries')
+    season = models.PositiveSmallIntegerField(db_index=True)
+    route = models.CharField(max_length=80, blank=True, default='')
+    division = models.CharField(max_length=12, blank=True, default='')
+    regular_win_pct = models.FloatField(default=0)
+    head_to_head_wins = models.PositiveSmallIntegerField(default=0)
+    # Stored once so the final tiebreak is fixed and can't be re-rolled.
+    tiebreak_draw = models.BigIntegerField(default=0)
+    status = models.CharField(
+        max_length=12, choices=STATUS_CHOICES, default=ACTIVE)
+    eliminated_round = models.PositiveSmallIntegerField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name_plural = 'playoff entries'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'season'], name='unique_playoff_entry_per_season'),
+        ]
+
+    def __str__(self):
+        return f'{self.user} in the {self.season} playoffs ({self.status})'
+
+
+class SquaresBoard(models.Model):
+    """The Super Bowl squares board for one season.
+
+    Columns (top) belong to the AWAY team, rows (side) to the HOME team.
+    `away_digits[3]` is the digit printed above column 3; `home_digits[7]` is
+    the digit beside row 7. Both are drawn once, after the squares are dealt.
+    """
+    season = models.PositiveSmallIntegerField(unique=True)
+    game = models.ForeignKey(
+        Game, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='squares_boards')
+    home_digits = models.CharField(max_length=10, blank=True, default='')
+    away_digits = models.CharField(max_length=10, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name_plural = 'squares boards'
+
+    def __str__(self):
+        return f'{self.season} Super Bowl squares'
+
+
+class BoardSquare(models.Model):
+    board = models.ForeignKey(SquaresBoard, on_delete=models.CASCADE, related_name='squares')
+    row = models.PositiveSmallIntegerField()
+    col = models.PositiveSmallIntegerField()
+    owner = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='board_squares')
+
+    class Meta:
+        ordering = ['row', 'col']
+        constraints = [
+            models.UniqueConstraint(fields=['board', 'row', 'col'], name='unique_square_per_board'),
+        ]
+
+    def __str__(self):
+        return f'Square (row {self.row}, col {self.col}): {self.owner or "open"}'
+

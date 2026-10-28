@@ -13,11 +13,16 @@ from django.urls import reverse
 
 from accounts import challenges
 from accounts import leaderboard as lb
-from accounts.models import PerformanceReaction, FriendRequest, Pick
+from accounts.models import PerformanceReaction, FriendRequest, Pick, PlayerIdentity
 from accounts.playermenu import menu_data, stats_summary
 from accounts.ranking import format_pct
+from accounts.team_identity import TEAM_CHOICES, TEAM_DATA, team_division
 from accounts.views import _selected_season, get_kickoff_label
 from accounts.standings import compute_standings, standing_for
+from accounts.playoffs import division_playoff_race
+from accounts.playoffs import championship_bracket
+from accounts.models import SquaresBoard
+from accounts.squares import board_grid
 from api.models import Game
 from api.rules import grade_pick
 from api.services import current_week, MAX_WEEK
@@ -327,10 +332,141 @@ def history_view(request):
 @login_required
 def profile(request):
     season = settings.NFL_SEASON
+    identity, _ = PlayerIdentity.objects.get_or_create(user=request.user)
+
+    if request.method == 'POST':
+        favorite_team = request.POST.get('favorite_team', '').strip().upper()
+        valid_teams = set(TEAM_DATA)
+        if favorite_team and favorite_team not in valid_teams:
+            messages.error(request, 'Please choose a valid NFL team.')
+        else:
+            # A division is assigned on first selection and remains locked for
+            # this season. At a new season boundary it follows the current team.
+            new_season = identity.division_season != season
+            identity.favorite_team = favorite_team
+            if favorite_team and (new_season or not identity.division):
+                identity.division = team_division(favorite_team)
+                identity.division_season = season
+            elif not favorite_team and new_season:
+                identity.division = ''
+                identity.division_season = None
+            identity.save()
+            messages.success(request, 'Your favorite team has been updated.')
+            return redirect('profile')
+    elif identity.division_season != season:
+        # Refresh the division at the start of a new configured NFL season.
+        if identity.favorite_team:
+            identity.division = team_division(identity.favorite_team)
+            identity.division_season = season
+        else:
+            identity.division = ''
+            identity.division_season = None
+        identity.save(update_fields=['division', 'division_season', 'updated_at'])
+
     return render(request, 'main/profile.html', {
         'stats': stats_summary(request.user, season),
         'stats_season': season,
+        'player_identity': identity,
+        'team_choices': TEAM_CHOICES,
+        'favorite_team_details': TEAM_DATA.get(identity.favorite_team),
     })
+
+
+
+DIVISION_CHOICES = (
+    'AFC East', 'AFC North', 'AFC South', 'AFC West',
+    'NFC East', 'NFC North', 'NFC South', 'NFC West',
+)
+
+def division_leaderboard(request):
+    """Show the current-season race for one NFL division.
+
+    Division membership comes from each player's season-locked PlayerIdentity;
+    records are always computed from existing picks and final scores. This is
+    deliberately a standings view, not playoff qualification/elimination logic.
+    """
+    season = settings.NFL_SEASON
+    identity = None
+    if request.user.is_authenticated:
+        identity = PlayerIdentity.objects.filter(user=request.user).first()
+        # Keep the seasonal snapshot in step with the existing profile behavior.
+        if identity and identity.division_season != season:
+            if identity.favorite_team:
+                identity.division = team_division(identity.favorite_team)
+                identity.division_season = season
+            else:
+                identity.division = ''
+                identity.division_season = None
+            identity.save(update_fields=['division', 'division_season', 'updated_at'])
+
+    division = request.GET.get('division', '').strip()
+    if division not in DIVISION_CHOICES:
+        division = identity.division if identity and identity.division in DIVISION_CHOICES else 'AFC East'
+
+    tab = request.GET.get('tab', 'season')
+    if tab not in ('season', 'weekly'):
+        tab = 'season'
+    weeks = lb.season_weeks(season)
+    try:
+        selected_week = int(request.GET.get('week', ''))
+    except (TypeError, ValueError):
+        selected_week = lb.default_week(season)
+    if selected_week not in weeks:
+        selected_week = lb.default_week(season)
+    if not weeks:
+        weeks = [1]
+
+    member_ids = PlayerIdentity.objects.filter(
+        division=division, division_season=season, user__is_superuser=False
+    ).values_list('user_id', flat=True)
+    members = list(User.objects.filter(id__in=member_ids).order_by('username'))
+    if tab == 'weekly':
+        standings = compute_standings(
+            season=season, week=selected_week, users=members, with_pending=True
+        )
+        playoff_race = None
+    else:
+        playoff_race = division_playoff_race(division, season)
+        standings = playoff_race['standings']
+    my_row = next((row for row in standings if request.user.is_authenticated and row.user.id == request.user.id), None)
+
+    return render(request, 'main/divisions.html', {
+        'division_choices': DIVISION_CHOICES,
+        'selected_division': division,
+        'selected_season': season,
+        'tab': tab,
+        'weeks': weeks,
+        'selected_week': selected_week,
+        'standings': standings,
+        'playoff_race': playoff_race,
+        'member_count': len(members),
+        'my_row': my_row,
+        'my_division': identity.division if identity and identity.division_season == season else '',
+        'season_url': f'?division={division.replace(" ", "+")}&tab=season',
+        'weekly_url': f'?division={division.replace(" ", "+")}&tab=weekly&week={selected_week}',
+    })
+
+def playoffs_view(request):
+    """Championship field and first-round bracket preview."""
+    season = settings.NFL_SEASON
+    bracket = championship_bracket(season=season, field_size=50)
+    my_entry = next((p for p in bracket['field']
+                     if request.user.is_authenticated and p['user'].id == request.user.id), None)
+    return render(request, 'main/playoffs.html', {
+        'bracket': bracket,
+        'my_entry': my_entry,
+        'page': 'playoffs',
+    })
+
+
+def squares_view(request):
+    """Super Bowl squares board for the configured season."""
+    season = settings.NFL_SEASON
+    board = SquaresBoard.objects.filter(season=season).select_related('game').first()
+    context = {'page': 'squares', 'season': season, 'board': board}
+    if board:
+        context.update(board_grid(board, request.user))
+    return render(request, 'main/squares.html', context)
 
 
 def about(request):

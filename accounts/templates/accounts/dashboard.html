@@ -31,6 +31,68 @@
         </details>
     </div>
 
+    <section class="weekly-mission {% if mission_complete %}is-complete{% endif %}" aria-labelledby="mission-title">
+        <div class="mission-topline">
+            <span class="mission-kicker">WEEK {{ mission_week }} · SIDE QUEST</span>
+            {% if mission_complete %}<span class="mission-status">MISSION COMPLETE ✓</span>{% else %}<span class="mission-status">{{ mission_picked_count }}/{{ mission_game_count }} locked in</span>{% endif %}
+        </div>
+        <div class="mission-content">
+            <div class="mission-copy">
+                <h2 id="mission-title">{% if mission_complete %}You're ready for kickoff.{% else %}Lock in your week.{% endif %}</h2>
+                <p>{% if mission_complete %}Every game picked. Now see how your calls stack up against your friends.{% elif mission_game_count %}Make your picks for every game to complete your weekly mission. Your picks lock at kickoff.{% else %}Your weekly mission will appear when the schedule is available.{% endif %}</p>
+            </div>
+            <a href="{% url 'picks' %}?season={{ selected_season }}&amp;week={{ mission_week }}" class="mission-cta">{% if mission_complete %}View your picks <span aria-hidden="true">→</span>{% else %}Continue picks <span aria-hidden="true">→</span>{% endif %}</a>
+        </div>
+        <div class="mission-progress" role="progressbar" aria-label="Weekly pick completion" aria-valuemin="0" aria-valuemax="{{ mission_game_count }}" aria-valuenow="{{ mission_picked_count }}">
+            <span style="width:{{ mission_percent }}%"></span>
+        </div>
+        <div class="mission-foot"><span>{{ mission_percent }}% complete</span><span>Reward: bragging rights 🏆</span></div>
+    </section>
+
+    <section class="weekly-race" aria-labelledby="weekly-race-title">
+        <div class="weekly-race-head">
+            <div>
+                <span class="race-kicker">THE FRIENDS SHOWDOWN</span>
+                <h2 id="weekly-race-title">Week {{ mission_week }} race</h2>
+                <p>Every final score moves the race. How do you stack up against your friends?</p>
+            </div>
+            {% if weekly_race_has_friends %}
+                <a class="race-board-link" href="{{ weekly_race_url }}">Full race <span aria-hidden="true">→</span></a>
+            {% endif %}
+        </div>
+
+
+        {% if weekly_race_has_friends %}
+            {% if weekly_race_my_row %}
+                <div class="race-position">
+                    <span class="race-position-label">YOUR POSITION</span>
+                    <strong>{% if weekly_race_my_row.completed %}#{{ weekly_race_my_row.rank }}{% else %}—{% endif %}</strong>
+                    <span>{{ weekly_race_my_row.wins }}–{{ weekly_race_my_row.losses }}–{{ weekly_race_my_row.ties }}{% if weekly_race_my_row.pending %} <small>· {{ weekly_race_my_row.pending }} pending</small>{% endif %}</span>
+                </div>
+            {% endif %}
+            <ol class="race-list">
+                {% for row in weekly_race_rows %}
+                    <li class="race-row {% if row.user.id == user.id %}is-you{% endif %}">
+                        <span class="race-rank">{% if row.completed %}{{ row.rank }}{% else %}—{% endif %}</span>
+                        <span class="race-player">{{ row.user.username }}{% if row.user.id == user.id %}<small>YOU</small>{% endif %}</span>
+                        <span class="race-record">{{ row.wins }}–{{ row.losses }}–{{ row.ties }}</span>
+                    </li>
+                {% endfor %}
+            </ol>
+            <p class="race-note">Rankings update as games go final. Unfinished games aren't counted as losses.</p>
+        {% else %}
+            <div class="race-empty">
+                <span class="race-empty-icon" aria-hidden="true">⚔️</span>
+                <div>
+                    <strong>Your rivals are waiting.</strong>
+                    <p>Add friends to turn every NFL week into a head-to-head race.</p>
+                </div>
+                <a href="#friendsToggle" class="btn btn-red" data-open-friends>Find friends</a>
+            </div>
+        {% endif %}
+    </section>
+
+
     <section class="scoreboard" aria-labelledby="record-title">
         <div class="scoreboard-head">
             <h2 id="record-title">Your record</h2>
@@ -372,6 +434,12 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     toggle.addEventListener('click', openDrawer);
+    document.querySelectorAll('[data-open-friends]').forEach(function (link) {
+        link.addEventListener('click', function (event) {
+            event.preventDefault();
+            openDrawer();
+        });
+    });
     closeButton.addEventListener('click', closeDrawer);
     backdrop.addEventListener('click', closeDrawer);
 

@@ -348,48 +348,51 @@ class RunSyncTests(TestCase):
 
 @override_settings(**SETTINGS)
 class SyncViewTests(TestCase):
+    AUTH = {"HTTP_X_SYNC_TOKEN": "secret-token"}
     GOOD_REPORT = {"errors": [], "schedule_weeks": [], "score_weeks": [], "final_games": 0, "current_week": 4}
 
     def test_missing_or_wrong_token_is_forbidden(self):
         with patch("api.views.run_sync") as run:
             self.assertEqual(self.client.get("/api/sync/").status_code, 403)
-            self.assertEqual(self.client.get("/api/sync/?token=nope").status_code, 403)
+            self.assertEqual(self.client.get("/api/sync/", HTTP_X_SYNC_TOKEN="nope").status_code, 403)
             run.assert_not_called()
 
     @override_settings(SYNC_TOKEN="")
     def test_an_empty_token_never_lets_anyone_in(self):
         with patch("api.views.run_sync") as run:
-            self.assertEqual(self.client.get("/api/sync/?token=").status_code, 403)
+            self.assertEqual(self.client.get("/api/sync/", HTTP_X_SYNC_TOKEN="").status_code, 403)
             self.assertEqual(self.client.get("/api/sync/").status_code, 403)
             run.assert_not_called()
 
     def test_correct_token_runs_the_sync(self):
         with patch("api.views.run_sync", return_value=self.GOOD_REPORT) as run:
-            response = self.client.get("/api/sync/?token=secret-token")
+            response = self.client.get("/api/sync/", **self.AUTH)
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json()["ok"])
         run.assert_called_once()
 
-    def test_token_in_a_header_also_works(self):
-        with patch("api.views.run_sync", return_value=self.GOOD_REPORT):
-            response = self.client.get("/api/sync/", HTTP_X_SYNC_TOKEN="secret-token")
-        self.assertEqual(response.status_code, 200)
+    def test_token_in_the_url_is_not_accepted(self):
+        # URLs get written to logs, so the token must come from the header only.
+        with patch("api.views.run_sync") as run:
+            response = self.client.get("/api/sync/?token=secret-token")
+        self.assertEqual(response.status_code, 403)
+        run.assert_not_called()
 
     def test_post_with_token_also_works(self):
         with patch("api.views.run_sync", return_value=self.GOOD_REPORT):
-            response = self.client.post("/api/sync/?token=secret-token")
+            response = self.client.post("/api/sync/", **self.AUTH)
         self.assertEqual(response.status_code, 200)
 
     def test_api_trouble_returns_502_so_the_scheduler_flags_it(self):
         report = {**self.GOOD_REPORT, "errors": ["scores week 4: boom"]}
         with patch("api.views.run_sync", return_value=report):
-            response = self.client.get("/api/sync/?token=secret-token")
+            response = self.client.get("/api/sync/", **self.AUTH)
         self.assertEqual(response.status_code, 502)
         self.assertFalse(response.json()["ok"])
 
     def test_a_crash_returns_500(self):
         with patch("api.views.run_sync", side_effect=RuntimeError("bug")):
-            response = self.client.get("/api/sync/?token=secret-token")
+            response = self.client.get("/api/sync/", **self.AUTH)
         self.assertEqual(response.status_code, 500)
 
 

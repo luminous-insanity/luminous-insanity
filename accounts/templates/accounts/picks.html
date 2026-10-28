@@ -139,6 +139,17 @@
                     </div>
                 </section>
             {% endif %}
+
+            {% if game_info.friend_pulse %}
+                <section class="friend-pulse friend-pulse-{{ game_info.friend_pulse.kind }}"
+                         aria-label="Friend pick reveal for {{ game_info.game.away_team }} versus {{ game_info.game.home_team }}">
+                    <span class="friend-pulse-icon" aria-hidden="true">{% if game_info.friend_pulse.kind == 'contrarian' %}⚡{% elif game_info.friend_pulse.kind == 'majority' %}🤝{% else %}↔{% endif %}</span>
+                    <div>
+                        <strong>{{ game_info.friend_pulse.headline }}</strong>
+                        <p>{{ game_info.friend_pulse.detail }}</p>
+                    </div>
+                </section>
+            {% endif %}
         </article>
     {% empty %}
         <p class="empty">No games are scheduled for this week yet.</p>

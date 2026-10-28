@@ -1,0 +1,74 @@
+{% extends 'main/base.html' %}
+{% block title %}Road to Super Bowl 50 | GameDayPicks{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="eyebrow">THE ROAD TO SUPER BOWL 50</p>
+    <h1>Championship Playoffs</h1>
+    <p>{{ bracket.season }} season · {{ bracket.field_count }} of {{ bracket.field_size }} championship spots filled</p>
+  </div>
+</div>
+<section class="card" style="padding:18px;margin:14px 0;">
+  <p class="eyebrow">THE CHAMPIONSHIP FIELD</p>
+  {% if bracket.is_provisional %}
+    <h2>Qualification is still provisional</h2>
+    <p class="muted">This is a live bracket preview based on current division standings. The field can change until every regular-season game is final.</p>
+  {% else %}
+    <h2>Regular-season qualification is final</h2>
+    <p class="muted">The field below combines automatic division qualifiers, one winning-percentage wildcard per division, and league-wide head-to-head wildcards. Match winners are not decided until elimination rounds are played.</p>
+  {% endif %}
+  {% if my_entry %}
+    <p><strong>Your current seed: #{{ my_entry.seed }}</strong> · {{ my_entry.division }} · {{ my_entry.record }}</p>
+  {% elif user.is_authenticated %}
+    <p>You are not currently in the top {{ bracket.field_size }} championship qualifiers. Keep climbing your division standings.</p>
+  {% else %}
+    <p><a href="{% url 'login' %}?next={% url 'playoffs' %}">Log in</a> to see your current championship position.</p>
+  {% endif %}
+  {% if bracket.slots_open %}<p class="muted">{{ bracket.slots_open }} championship spot{{ bracket.slots_open|pluralize }} currently open based on the configured division qualifiers.</p>{% endif %}
+</section>
+
+<section class="card" style="padding:18px;margin:14px 0;">
+  <p class="eyebrow">ROUND 1</p>
+  {% if bracket.first_round %}
+    <p class="muted">{{ bracket.byes|length }} top seed{{ bracket.byes|length|pluralize }} receive a bye. Matchups are previews; no players are eliminated yet.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;">
+      {% for match in bracket.first_round %}
+      <article style="border:1px solid var(--border-color, #dbe3ec);border-radius:12px;padding:12px;">
+        <p class="eyebrow">MATCH {{ forloop.counter }}</p>
+        <div style="display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--border-color, #dbe3ec);">
+          <span><strong>#{{ match.high.seed }}</strong> {{ match.high.user.username }}<br><small class="muted">{{ match.high.qualification_route }}</small></span><span class="muted">{{ match.high.record }}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;gap:10px;padding:7px 0;">
+          <span><strong>#{{ match.low.seed }}</strong> {{ match.low.user.username }}<br><small class="muted">{{ match.low.qualification_route }}</small></span><span class="muted">{{ match.low.record }}</span>
+        </div>
+        <p class="muted" style="margin:5px 0 0;">Winner: TBD</p>
+      </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="muted">Not enough qualified players to form a first-round matchup yet.</p>
+  {% endif %}
+</section>
+
+<section class="card" style="padding:18px;margin:14px 0;">
+  <p class="eyebrow">FIRST-ROUND BYES</p>
+  {% if bracket.byes %}
+    <ol class="lb-list">
+    {% for player in bracket.byes %}
+      <li class="division-standing-row{% if user.is_authenticated and player.user.id == user.id %} is-me{% endif %}">
+        <span class="lb-rank">#{{ player.seed }}</span>
+        <div class="division-player"><strong>{{ player.user.username }}</strong><span class="muted">{{ player.division }} · {{ player.qualification_route }}</span></div>
+        <div class="division-record"><strong>{{ player.record }}</strong><span class="muted">W–L–T</span></div>
+      </li>
+    {% endfor %}
+    </ol>
+  {% else %}<p class="muted">No byes at the current field size.</p>{% endif %}
+</section>
+
+<section class="card" style="padding:18px;margin:14px 0;">
+  <p class="eyebrow">QUALIFIERS BY DIVISION</p>
+  <p class="muted">Qualification combines the configured automatic spots in each division, one winning-percentage wildcard per division, and {{ bracket.head_to_head_wildcard_spots }} league-wide head-to-head wildcard spot{{ bracket.head_to_head_wildcard_spots|pluralize }}. Only completed challenge victories count; players already qualified through another route cannot take a second spot.</p>
+  <a class="btn" href="{% url 'divisions' %}">View Division Wars</a>
+</section>
+<p class="division-footnote">This phase creates the field and bracket preview only. It does not yet record elimination results or declare a champion; those require a postseason scoring and tie-break rule.</p>
+{% endblock %}

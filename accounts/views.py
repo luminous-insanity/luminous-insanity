@@ -18,7 +18,7 @@ from .models import Pick, FriendRequest, PerformanceReaction, Challenge, Achieve
 from . import challenges
 from .leaderboard import default_week
 from .playermenu import menu_data, stats_summary
-from .standings import standing_for
+from .standings import compute_standings, standing_for
 from .achievements import achievement_summary
 import logging
 
@@ -164,6 +164,51 @@ def dashboard(request):
         for friend_request in accepted_requests
     ]
 
+    # Weekly mission: an optional, low-pressure objective that gives players
+    # something concrete to complete before kickoff without changing standings.
+    mission_week = (
+        current_week() if selected_season == settings.NFL_SEASON
+        else default_week(selected_season)
+    )
+
+    # Weekly friend race: put the user's current week in a small, live-feeling
+    # competition panel. This is a view over the existing pick/score data only;
+    # it adds no stored totals and cannot affect the canonical leaderboard.
+    weekly_race_rows = []
+    weekly_race_my_row = None
+    weekly_race_has_friends = bool(friends)
+    if weekly_race_has_friends:
+        race_users = [request.user] + friends
+        weekly_race_rows = compute_standings(
+            week=mission_week,
+            season=selected_season,
+            users=race_users,
+            with_pending=True,
+        )
+        weekly_race_my_row = next(
+            (row for row in weekly_race_rows if row.user.id == request.user.id),
+            None,
+        )
+        # Keep the panel compact, but never hide the signed-in player if they
+        # are outside the top five.
+        top_race_rows = weekly_race_rows[:5]
+        if weekly_race_my_row and all(
+            row.user.id != request.user.id for row in top_race_rows
+        ):
+            top_race_rows.append(weekly_race_my_row)
+        weekly_race_rows = top_race_rows
+
+    mission_games = Game.objects.filter(season=selected_season, week=mission_week)
+    mission_game_count = mission_games.count()
+    mission_picked_count = Pick.objects.filter(
+        user=request.user, game__season=selected_season, game__week=mission_week
+    ).count()
+    mission_percent = (
+        round(mission_picked_count * 100 / mission_game_count)
+        if mission_game_count else 0
+    )
+    mission_complete = bool(mission_game_count and mission_picked_count >= mission_game_count)
+
     # Expanded stats, the Challenges card, and the friend-tap menu.
     my_stats = stats_summary(request.user, selected_season)
     menus = menu_data(
@@ -246,6 +291,18 @@ def dashboard(request):
     activity_feed = activity_feed[:10]
 
     context = {
+        'mission_week': mission_week,
+        'mission_game_count': mission_game_count,
+        'mission_picked_count': mission_picked_count,
+        'mission_percent': mission_percent,
+        'mission_complete': mission_complete,
+        'weekly_race_rows': weekly_race_rows,
+        'weekly_race_my_row': weekly_race_my_row,
+        'weekly_race_has_friends': weekly_race_has_friends,
+        'weekly_race_url': (
+            f"{reverse('leaderboard')}?tab=weekly&season={selected_season}"
+            f"&week={mission_week}&filter=friends"
+        ),
         'activity_feed': activity_feed,
         'invite_url': invite_url,
         'invite_text': invite_text,
@@ -310,6 +367,28 @@ def picks(request, week_number=None):
     # Aggregate every site's picks for each game. These percentages are based
     # only on users who have actually submitted a pick for that game.
     community_pick_counts = {}
+
+    # Friend Pulse is deliberately hidden until kickoff. Before a game starts,
+    # the normal friend-pick privacy rules apply; after kickoff, players can
+    # see whether their call agrees with or goes against their accepted friends.
+    friend_ids = set()
+    if request.user.is_authenticated:
+        accepted_friendships = FriendRequest.objects.filter(
+            status=FriendRequest.ACCEPTED,
+        ).filter(Q(sender=request.user) | Q(receiver=request.user))
+        friend_ids = set(accepted_friendships.exclude(
+            sender=request.user, receiver=request.user
+        ).values_list('sender_id', flat=True)) | set(accepted_friendships.values_list('receiver_id', flat=True))
+        friend_ids.discard(request.user.id)
+
+    friend_pick_counts = {}
+    if friend_ids:
+        for row in Pick.objects.filter(
+            game__in=games, user_id__in=friend_ids
+        ).values('game_id', 'team_picked').annotate(total=Count('id')):
+            friend_pick_counts.setdefault(row['game_id'], {'home': 0, 'away': 0})[
+                row['team_picked']
+            ] = row['total']
     for row in (
         Pick.objects.filter(game__in=games)
         .values('game_id', 'team_picked')
@@ -327,6 +406,30 @@ def picks(request, week_number=None):
         away_percent = round(counts['away'] * 100 / community_total) if community_total else 0
         home_percent = 100 - away_percent if community_total else 0
         user_pick = picks_by_game.get(game.pk)
+        friend_counts = friend_pick_counts.get(game.pk, {'home': 0, 'away': 0})
+        friend_total = friend_counts['home'] + friend_counts['away']
+        friend_same = friend_counts.get(user_pick, 0) if user_pick else 0
+        friend_opposite = friend_total - friend_same if user_pick else 0
+        friend_pulse = None
+        if game.has_started and user_pick and friend_total:
+            if friend_same > friend_opposite:
+                friend_pulse = {
+                    'kind': 'majority',
+                    'headline': 'You backed the friend-group favorite',
+                    'detail': f'{friend_same} friend{"s" if friend_same != 1 else ""} picked the same team as you.',
+                }
+            elif friend_same < friend_opposite:
+                friend_pulse = {
+                    'kind': 'contrarian',
+                    'headline': 'You went against the group',
+                    'detail': f'{friend_opposite} friend{"s" if friend_opposite != 1 else ""} picked the other team.',
+                }
+            else:
+                friend_pulse = {
+                    'kind': 'split',
+                    'headline': 'Your friend group is split',
+                    'detail': f'{friend_same} friend{"s" if friend_same != 1 else ""} agreed with you; {friend_opposite} picked the other team.',
+                }
         game_data.append({
             'game': game,
             'kickoff_label': get_kickoff_label(game),
@@ -341,6 +444,7 @@ def picks(request, week_number=None):
             'community_away_percent': away_percent,
             'community_home_percent': home_percent,
             'show_community_picks': bool(user_pick and community_total),
+            'friend_pulse': friend_pulse,
         })
 
     picked_count = sum(1 for item in game_data if item['pick_status'] in (Pick.HOME, Pick.AWAY))

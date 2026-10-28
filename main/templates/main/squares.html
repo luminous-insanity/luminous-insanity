@@ -1,0 +1,86 @@
+{% extends 'main/base.html' %}
+{% block title %}Super Bowl Squares | GameDayPicks{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="eyebrow">THE FINAL 50</p>
+    <h1>Super Bowl Squares</h1>
+    {% if board %}
+      <p>{{ season }} season · {{ away_team }} at {{ home_team }} · {{ player_count }} player{{ player_count|pluralize }}, 100 squares</p>
+    {% else %}
+      <p>{{ season }} season</p>
+    {% endif %}
+  </div>
+</div>
+
+{% if not board %}
+<section class="card" style="padding:18px;margin:14px 0;">
+  <h2>The board hasn't been drawn yet</h2>
+  <p class="muted">Squares are dealt to the players who survive the final playoff cut. Once the field is set, every player gets an equal share of the 100 squares and the numbers across the top and side are drawn at random.</p>
+  <p><a href="{% url 'playoffs' %}">See the playoff field</a></p>
+</section>
+{% else %}
+<section class="card" style="padding:18px;margin:14px 0;">
+  <p class="eyebrow">YOUR SQUARES</p>
+  {% if user.is_authenticated %}
+    {% if my_count %}
+      <p><strong>You own {{ my_count }} square{{ my_count|pluralize }}.</strong> They are highlighted in gold below.</p>
+    {% else %}
+      <p class="muted">You don't have any squares on this board.</p>
+    {% endif %}
+  {% else %}
+    <p><a href="{% url 'login' %}?next={% url 'squares' %}">Log in</a> to see your squares highlighted.</p>
+  {% endif %}
+</section>
+
+<section class="card" style="padding:18px;margin:14px 0;">
+  <p class="eyebrow">THE BOARD</p>
+  <p class="muted">Each quarter, take the last digit of each team's score. The square where that {{ away_team }} column meets that {{ home_team }} row wins.</p>
+  <div class="table-wrap">
+    <table class="squares-grid">
+      <thead>
+        <tr>
+          <th class="corner" scope="col"><span>{{ home_team }} ↓</span><span>{{ away_team }} →</span></th>
+          {% for digit in away_digits %}<th class="axis" scope="col">{{ digit }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <th class="axis" scope="row">{{ row.digit }}</th>
+          {% for cell in row.cells %}
+          <td class="{% if cell.mine %}mine{% endif %} {% if cell.wins %}win{% endif %}" title="{{ cell.owner }}{% if cell.wins %} · wins {{ cell.wins|join:', ' }}{% endif %}">
+            {{ cell.owner|truncatechars:9 }}{% if cell.wins %}<small>{{ cell.wins|length }}×</small>{% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card" style="padding:18px;margin:14px 0;">
+  <p class="eyebrow">WINNERS</p>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>When</th><th>Score</th><th>Winning square</th><th>Owner</th></tr></thead>
+      <tbody>
+        {% for r in results %}
+        <tr>
+          <td>{{ r.label }}</td>
+          {% if r.scored %}
+            <td>{{ away_team }} {{ r.away_score }} · {{ home_team }} {{ r.home_score }}</td>
+            <td>{{ away_team }} {{ r.away_digit }} · {{ home_team }} {{ r.home_digit }}</td>
+            <td><strong>{% if r.owner %}{{ r.owner.username }}{% else %}Nobody{% endif %}</strong></td>
+          {% else %}
+            <td class="muted" colspan="3">Not played yet</td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

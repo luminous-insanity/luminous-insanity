@@ -35,9 +35,18 @@
         function placePopup(row) {
             panel.style.transform = '';
             if (phone.matches) {            // CSS pins the bottom sheet
-                panel.style.top = panel.style.left = '';
+                panel.style.position = '';
+                panel.style.top = '';
+                panel.style.left = '';
                 return;
             }
+
+            /*
+             * The desktop menu is inside a grid-centred overlay. Positioning a
+             * relatively positioned panel with left/top offsets it from that
+             * centred spot, which makes it appear beside the clicked player.
+             * Fixed positioning makes these viewport coordinates exact.
+             */
             var r = row.getBoundingClientRect();
             var w = panel.offsetWidth, h = panel.offsetHeight;
             var left = Math.min(Math.max(8, r.left + 24), window.innerWidth - w - 8);
@@ -45,6 +54,7 @@
             if (top + h > window.innerHeight - 8) {
                 top = Math.max(8, r.top - h - 6);
             }
+            panel.style.position = 'fixed';
             panel.style.left = left + 'px';
             panel.style.top = top + 'px';
         }

@@ -13,6 +13,38 @@
         </div>
     </div>
 
+    <section class="card favorite-team-card">
+        <div class="detail-card-head">
+            <h2>Your Team Identity</h2>
+            <p class="muted">Make GameDayPicks feel like your team.</p>
+        </div>
+        {% if favorite_team_details %}
+            <div class="favorite-team-preview" style="--favorite-team-primary: {{ favorite_team_details.primary }}; --favorite-team-secondary: {{ favorite_team_details.secondary }};">
+                <span class="favorite-team-swatch" aria-hidden="true"></span>
+                <div>
+                    <strong>{{ favorite_team_details.name }}</strong>
+                    <span class="muted">Season division: {{ player_identity.division|default:favorite_team_details.division }}</span>
+                </div>
+            </div>
+        {% else %}
+            <p class="muted">Choose a favorite NFL team to personalize your buttons and accents across the site.</p>
+        {% endif %}
+        <form method="post" class="favorite-team-form">
+            {% csrf_token %}
+            <label for="favorite_team">Favorite NFL team</label>
+            <select id="favorite_team" name="favorite_team">
+                {% for code, name in team_choices %}
+                    <option value="{{ code }}" {% if player_identity.favorite_team == code %}selected{% endif %}>{{ name }}</option>
+                {% endfor %}
+            </select>
+            <p class="form-help">You can change your favorite team whenever you want. Your division is locked for the season once assigned; it will update to match your favorite team next season.</p>
+            {% if player_identity.division %}
+                <p class="division-lock"><strong>Season division:</strong> {{ player_identity.division }} <span>· {{ player_identity.division_season }}</span></p>
+            {% endif %}
+            <button type="submit" class="btn btn-red">Save favorite team</button>
+        </form>
+    </section>
+
     <section class="card detail-card">
         <div class="detail-card-head"><h2>Account</h2></div>
         <dl class="detail-list">

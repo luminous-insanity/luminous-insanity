@@ -9,7 +9,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from accounts.models import Pick
+from accounts.models import Pick, PlayerIdentity
 from api.helpers_for_tests import make_final, make_game
 
 
@@ -134,6 +134,7 @@ class LeaderboardPageTests(TestCase):
 
 # ------------------------------------------------------------- profile page --
 
+@override_settings(NFL_SEASON=2026)
 class ProfileTests(TestCase):
     def test_login_is_required(self):
         response = self.client.get(reverse("profile"))
@@ -157,6 +158,42 @@ class ProfileTests(TestCase):
         self.client.force_login(make_user("alice"))
         self.assertNotContains(self.client.get(reverse("profile")), "bob@example.com")
 
+    def test_profile_can_save_favorite_team_and_personalizes_site(self):
+        user = make_user("teamfan")
+        self.client.force_login(user)
+        response = self.client.post(reverse("profile"), {"favorite_team": "KC"})
+        self.assertRedirects(response, reverse("profile"))
+        identity = PlayerIdentity.objects.get(user=user)
+        self.assertEqual(identity.favorite_team, "KC")
+        self.assertEqual(identity.division, "AFC West")
+        self.assertEqual(identity.division_season, 2026)
+        response = self.client.get(reverse("dashboard"))
+        self.assertContains(response, 'data-team-theme="true"')
+        self.assertContains(response, "--primary: #E31837")
+
+    def test_favorite_team_can_change_but_division_stays_locked_this_season(self):
+        user = make_user("divisionfan")
+        self.client.force_login(user)
+        self.client.post(reverse("profile"), {"favorite_team": "KC"})
+        self.client.post(reverse("profile"), {"favorite_team": "GB"})
+        identity = PlayerIdentity.objects.get(user=user)
+        self.assertEqual(identity.favorite_team, "GB")
+        self.assertEqual(identity.division, "AFC West")
+        self.assertEqual(identity.division_season, 2026)
+
+    def test_division_refreshes_from_current_favorite_team_next_season(self):
+        user = make_user("seasonfan")
+        self.client.force_login(user)
+        self.client.post(reverse("profile"), {"favorite_team": "KC"})
+        self.client.post(reverse("profile"), {"favorite_team": "GB"})
+        with override_settings(NFL_SEASON=2027):
+            response = self.client.get(reverse("profile"))
+        self.assertEqual(response.status_code, 200)
+        identity = PlayerIdentity.objects.get(user=user)
+        self.assertEqual(identity.favorite_team, "GB")
+        self.assertEqual(identity.division, "NFC North")
+        self.assertEqual(identity.division_season, 2027)
+
 
 # -------------------------------------------------- header, footer and links --
 
@@ -169,7 +206,7 @@ class NavigationTests(TestCase):
 
     def test_every_page_renders_when_logged_in(self):
         self.client.force_login(make_user("alice"))
-        for name in ("home", "leaderboard", "dashboard", "history", "profile"):
+        for name in ("home", "leaderboard", "divisions", "dashboard", "history", "profile"):
             with self.subTest(page=name):
                 self.assertEqual(self.client.get(reverse(name)).status_code, 200)
 
@@ -236,3 +273,41 @@ class HistoryTests(TestCase):
 
     def test_empty_history_message(self):
         self.assertContains(self.client.get(self.url), "No pick history available")
+
+
+# -------------------------------------------------------- division standings --
+
+@override_settings(NFL_SEASON=2026)
+class DivisionLeaderboardTests(TestCase):
+    def test_division_page_loads_and_shows_empty_state(self):
+        response = self.client.get(reverse("divisions"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Division Wars")
+        self.assertContains(response, "waiting for its first players")
+
+    def test_members_are_ranked_using_existing_season_records(self):
+        alice = make_user("alice")
+        bob = make_user("bob")
+        PlayerIdentity.objects.create(user=alice, favorite_team="KC", division="AFC West", division_season=2026)
+        PlayerIdentity.objects.create(user=bob, favorite_team="DEN", division="AFC West", division_season=2026)
+        game = make_game(home_team="KC", away_team="DEN")
+        make_final(game, home_score=24, away_score=10)
+        Pick.objects.create(user=alice, game=game, team_picked="home")
+        Pick.objects.create(user=bob, game=game, team_picked="away")
+        response = self.client.get(reverse("divisions"), {"division": "AFC West"})
+        self.assertEqual(response.status_code, 200)
+        rows = response.context["standings"]
+        self.assertEqual([row.user.username for row in rows], ["alice", "bob"])
+        self.assertEqual((rows[0].wins, rows[0].losses), (1, 0))
+        self.assertEqual((rows[1].wins, rows[1].losses), (0, 1))
+
+    def test_division_season_snapshot_excludes_stale_membership(self):
+        user = make_user("oldmember")
+        PlayerIdentity.objects.create(user=user, favorite_team="KC", division="AFC West", division_season=2025)
+        response = self.client.get(reverse("divisions"), {"division": "AFC West"})
+        self.assertEqual(response.context["member_count"], 0)
+
+    def test_invalid_division_falls_back_to_safe_choice(self):
+        response = self.client.get(reverse("divisions"), {"division": "not-a-division"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["selected_division"], "AFC East")

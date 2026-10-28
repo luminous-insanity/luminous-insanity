@@ -79,6 +79,38 @@ class Game(models.Model):
         return self.home_team if side == "home" else self.away_team
 
 
+class QuarterScore(models.Model):
+    """The running score at the end of a quarter (cumulative, not per quarter).
+
+    Quarters 1-3 are stored here: end of Q1, halftime, end of Q3. The "Final"
+    square always uses the game's own final score (overtime included), so
+    there is no quarter 4 row.
+
+    `source` says who wrote the row. Today that is "manual" (admin or the
+    squares command). A future score sync can write "sync" rows and only ever
+    overwrite its own, so hand-entered corrections are never lost.
+    """
+    MANUAL = 'manual'
+    SYNC = 'sync'
+    QUARTER_CHOICES = [(1, 'End of Q1'), (2, 'Halftime'), (3, 'End of Q3')]
+
+    game = models.ForeignKey(Game, on_delete=models.CASCADE, related_name='quarter_scores')
+    quarter = models.PositiveSmallIntegerField(choices=QUARTER_CHOICES)
+    home_score = models.PositiveSmallIntegerField()
+    away_score = models.PositiveSmallIntegerField()
+    source = models.CharField(max_length=10, default=MANUAL)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['game', 'quarter']
+        constraints = [
+            models.UniqueConstraint(fields=['game', 'quarter'], name='unique_quarter_score_per_game'),
+        ]
+
+    def __str__(self):
+        return f'{self.game}: Q{self.quarter} {self.away_score}-{self.home_score}'
+
+
 class Score(models.Model):
     """Legacy. Scores now live on Game. Kept so old data isn't lost;
     safe to delete later."""

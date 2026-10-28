@@ -1,5 +1,5 @@
 {% load static %}<!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="light"{% if team_theme.enabled %} data-team-theme="true" style="--primary: {{ team_theme.primary }}; --link: {{ team_theme.primary }}; --focus: {{ team_theme.secondary }}; --on-primary: {{ team_theme.on_primary }}; --team-accent: {{ team_theme.secondary }};"{% else %} data-team-theme="false"{% endif %}>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -56,6 +56,9 @@
                         </summary>
                         <div class="account-panel">
                             <a href="{% url 'profile' %}">Profile</a>
+                            <a href="{% url 'divisions' %}">Division Wars</a>
+                            <a href="{% url 'playoffs' %}">Playoff Bracket</a>
+                            <a href="{% url 'squares' %}">Super Bowl Squares</a>
                             <a href="{% url 'achievements' %}">Achievements</a>
                             <a href="{% url 'challenges' %}">Challenges</a>
                             <a href="{% url 'logout' %}">Log out</a>
@@ -82,6 +85,14 @@
             <a href="{% url 'dashboard' %}" {% if page == 'dashboard' %}aria-current="page"{% endif %}>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 20c.8-3.6 3.6-5.4 7-5.4s6.2 1.8 7 5.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
                 <span>Dashboard</span>
+            </a>
+            <a href="{% url 'divisions' %}" {% if page == 'divisions' %}aria-current="page"{% endif %}>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h6v6H4zM14 5h6v6h-6zM4 15h6v6H4zM14 15h6v6h-6z" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+                <span>Divisions</span>
+            </a>
+            <a href="{% url 'playoffs' %}" {% if page == 'playoffs' %}aria-current="page"{% endif %}>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM9 10v4h6v-4M12 14v6M9 20h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                <span>Playoffs</span>
             </a>
         {% else %}
             <a href="{% url 'home' %}" {% if page == 'home' %}aria-current="page"{% endif %}>

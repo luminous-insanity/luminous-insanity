@@ -211,9 +211,11 @@ def evaluate_many(challenges):
     return results
 
 
-def records(user_ids=None):
-    """{user_id: [won, lost, tied]} over every finished challenge."""
+def records(user_ids=None, season=None):
+    """{user_id: [won, lost, tied]} over finished challenges, optionally by season."""
     accepted = Challenge.objects.filter(status=Challenge.ACCEPTED)
+    if season is not None:
+        accepted = accepted.filter(season=season)
     if user_ids is not None:
         accepted = accepted.filter(
             Q(challenger_id__in=user_ids) | Q(opponent_id__in=user_ids))

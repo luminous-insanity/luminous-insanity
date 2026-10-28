@@ -60,7 +60,7 @@ def _tally(picks, table):
             standing.ties += 1
 
 
-def _final_picks(user_ids, season=None, week=None):
+def _final_picks(user_ids, season=None, week=None, through_week=None):
     if season is None:
         season = settings.NFL_SEASON
 
@@ -72,11 +72,13 @@ def _final_picks(user_ids, season=None, week=None):
 
     if week is not None:
         picks = picks.filter(game__week=week)
+    if through_week is not None:
+        picks = picks.filter(game__week__lte=through_week)
 
     return picks.select_related("game")
 
 
-def _count_pending(table, season, week=None):
+def _count_pending(table, season, week=None, through_week=None):
     """Picks that can't be graded yet. They are never counted as losses."""
     picks = Pick.objects.filter(
         user_id__in=table.keys(),
@@ -88,15 +90,19 @@ def _count_pending(table, season, week=None):
     )
     if week is not None:
         picks = picks.filter(game__week=week)
+    if through_week is not None:
+        picks = picks.filter(game__week__lte=through_week)
     for user_id in picks.values_list("user_id", flat=True):
         table[user_id].pending += 1
 
 
-def compute_standings(week=None, season=None, users=None, with_pending=False):
+def compute_standings(week=None, season=None, users=None, with_pending=False, through_week=None):
     """Leaderboard: season-wide by default, or for one selected week.
 
     users:        limit the table to these users (default: every non-admin).
     with_pending: also count each player's not-yet-final picks.
+    through_week: ignore games after this week (used to keep playoff games
+                  out of regular-season records).
 
     Order and ranking: most wins, then fewest losses, then most ties; players
     who are still level share a rank (1, 1, 3) and are listed alphabetically.
@@ -109,9 +115,9 @@ def compute_standings(week=None, season=None, users=None, with_pending=False):
     users = list(users)
     table = {u.id: Standing(user=u) for u in users}
 
-    _tally(_final_picks(table.keys(), season=season, week=week), table)
+    _tally(_final_picks(table.keys(), season=season, week=week, through_week=through_week), table)
     if with_pending:
-        _count_pending(table, season, week)
+        _count_pending(table, season, week, through_week)
 
     rows = sorted(
         table.values(),
