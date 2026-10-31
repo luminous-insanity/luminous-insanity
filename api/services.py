@@ -9,7 +9,9 @@ and the final scores (see accounts/standings.py).
 
 API usage is kept small on purpose:
   * a score call only happens when a game has started and isn't final yet,
-    and never more than once every 10 minutes per game
+    and never more than once every 15 minutes per game (aligned with a
+    typical free cron interval so live scores stay fresh without fighting
+    the scheduler)
   * the schedule for a week is loaded once, then refreshed at most once a day
 So you can call run_sync() as often as you like; it only spends API calls
 when there is something to learn.
@@ -28,9 +30,12 @@ from django.core.cache import cache
 
 log = logging.getLogger(__name__)
 
-MAX_WEEK = 18            # regular season
+REGULAR_SEASON_MAX_WEEK = 18
+FIRST_PLAYOFF_WEEK = 19
+PLAYOFF_ROUNDS = 4
+MAX_WEEK = FIRST_PLAYOFF_WEEK + PLAYOFF_ROUNDS - 1  # 22
 REQUEST_TIMEOUT = 15     # seconds; never let a hung request freeze the site
-LIVE_RECHECK = timedelta(minutes=10)
+LIVE_RECHECK = timedelta(minutes=15)  # match free cron-job.org interval; cache live scores this long
 STALE_RECHECK = timedelta(hours=24)
 LIVE_WINDOW = timedelta(hours=8)     # how long after kickoff we poll often
 EXPECTED_LENGTH = timedelta(hours=5)  # NFL games run about 3.5 hours; leave margin
@@ -39,6 +44,36 @@ GIVE_UP_AFTER_DAYS = 14              # stop auto-polling games this old
 
 class ApiError(Exception):
     pass
+
+
+def _week_api_params(week, endpoint):
+    """
+    Translate GameDayPicks weeks into Tank01 API parameters.
+
+    Internal weeks 1-18 are regular season.
+    Internal weeks 19-22 are postseason rounds 1-4.
+    """
+    if 1 <= week <= REGULAR_SEASON_MAX_WEEK:
+        season_type = "reg"
+        api_week = week
+    elif FIRST_PLAYOFF_WEEK <= week <= MAX_WEEK:
+        season_type = "post"
+        api_week = week - FIRST_PLAYOFF_WEEK + 1
+    else:
+        raise ApiError(f"Unsupported GameDayPicks week: {week}")
+
+    if endpoint == "getNFLGamesForWeek" and season_type == "post":
+        week_param = "gameWeek"
+    elif endpoint == "getNFLGamesForWeek":
+        week_param = "week"
+    else:
+        week_param = "gameWeek"
+
+    return {
+        week_param: api_week,
+        "seasonType": season_type,
+        "season": settings.NFL_SEASON,
+    }
 
 
 def _get(endpoint, params):
@@ -104,9 +139,10 @@ def sync_schedule(week):
     (matched on game_id) so picks are never lost. Scores/status are left alone.
     Returns (games_seen, games_with_kickoff_time).
     """
-    body = _get("getNFLGamesForWeek", {
-        "week": week, "seasonType": "reg", "season": settings.NFL_SEASON,
-    })
+    body = _get(
+        "getNFLGamesForWeek",
+        _week_api_params(week, "getNFLGamesForWeek"),
+    )
     raw_games = body if isinstance(body, list) else []
     now = timezone.now()
     seen = with_kickoff = 0
@@ -139,9 +175,10 @@ def sync_scores(week):
     One API call returns every game in the week. Save status and scores for
     each game we know about. Returns how many games in the week are final.
     """
-    body = _get("getNFLScoresOnly", {
-        "gameWeek": week, "seasonType": "reg", "season": settings.NFL_SEASON,
-    })
+    body = _get(
+        "getNFLScoresOnly",
+        _week_api_params(week, "getNFLScoresOnly"),
+    )
     if not isinstance(body, dict):
         return 0
     now = timezone.now()
@@ -230,7 +267,9 @@ def run_sync():
 
     # 3. When the latest loaded week is completely finished, open the next one.
     latest = games.aggregate(latest=Max("week"))["latest"]
-    if (latest and latest < MAX_WEEK
+
+    if (latest
+            and latest < MAX_WEEK
             and not games.filter(week=latest).exclude(status=Game.FINAL).exists()):
         if attempt(f"schedule week {latest + 1}", sync_schedule, latest + 1) is not None:
             report["schedule_weeks"].append(latest + 1)

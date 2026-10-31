@@ -13,21 +13,40 @@
             <a href="{% url 'leaderboard' %}" class="btn btn-quiet">Leaderboard</a>
         </div>
     {% else %}
-        <h1>Pick every game. Beat your friends.</h1>
-        <p>Choose a winner for each NFL game, climb the weekly leaderboard, and settle who really knows football.</p>
-        <div class="hero-actions">
-            <a href="{% url 'signup' %}" class="btn btn-red">Join for free</a>
-            <a href="{% url 'leaderboard' %}" class="btn btn-quiet">See the leaderboard</a>
+        <div class="hero-landing">
+            <h1>Pick every game.<br>Beat your friends.</h1>
+            <p>The NFL pick'em game that feels like a game. Weekly missions, rivalries, trophies, and a race that never stops.</p>
+            <div class="hero-cta">
+                <a href="{% url 'signup' %}" class="btn">Join free — start picking</a>
+                <a href="{% url 'leaderboard' %}" class="btn btn-quiet">See the leaderboard</a>
+            </div>
         </div>
     {% endif %}
 </section>
 
 {% if not user.is_authenticated %}
-<ol class="steps">
-    <li>Pick winners<span>Choose before each game kicks off.</span></li>
-    <li>Watch the scores<span>Results update as games finish.</span></li>
-    <li>Climb the board<span>Compete weekly and all season.</span></li>
-</ol>
+<div class="feature-grid">
+    <div class="feature-card">
+        <div class="icon">🎯</div>
+        <h3>Weekly missions</h3>
+        <p>Lock every pick before kickoff. Clear progress, clear rewards, no spreadsheet vibes.</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">⚔️</div>
+        <h3>Rivalries & challenges</h3>
+        <p>Challenge friends head-to-head. Settle debates with real picks and real bragging rights.</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">🏆</div>
+        <h3>Trophies & streaks</h3>
+        <p>Earn achievements for perfect weeks, hot streaks, and season mastery. Show them off.</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">🏈</div>
+        <h3>Playoffs & more</h3>
+        <p>Survive the cuts. Make the playoffs. Compete in squares. Always something on the line.</p>
+    </div>
+</div>
 {% endif %}
 
 <section class="section" aria-labelledby="games-title">
@@ -54,13 +73,13 @@
                             <span class="pill pill-live">Live</span>
                         {% endif %}
                     </div>
-                    <div class="tile-row {% if game.is_final and game.away_score > game.home_score %}is-winner{% endif %}">
+                    <div class="tile-row {% if game.away_score is not None and game.home_score is not None and game.away_score > game.home_score %}is-winner{% endif %}">
                         <span class="tile-team">{{ game.away_team }}</span>
-                        {% if game.is_final %}<span class="tile-score has-score">{{ game.away_score }}</span>{% endif %}
+                        {% if game.away_score is not None %}<span class="tile-score has-score">{{ game.away_score }}</span>{% endif %}
                     </div>
-                    <div class="tile-row {% if game.is_final and game.home_score > game.away_score %}is-winner{% endif %}">
+                    <div class="tile-row {% if game.home_score is not None and game.away_score is not None and game.home_score > game.away_score %}is-winner{% endif %}">
                         <span class="tile-team">{{ game.home_team }}</span>
-                        {% if game.is_final %}<span class="tile-score has-score">{{ game.home_score }}</span>{% endif %}
+                        {% if game.home_score is not None %}<span class="tile-score has-score">{{ game.home_score }}</span>{% endif %}
                     </div>
                 </article>
             {% endfor %}

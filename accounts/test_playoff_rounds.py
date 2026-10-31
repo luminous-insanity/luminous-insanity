@@ -1,4 +1,5 @@
 from datetime import date
+from unittest.mock import patch
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -47,6 +48,14 @@ class CutRulesTests(SimpleTestCase):
 
 
 class PlayoffFlowTests(TestCase):
+    """
+    Flow tests for open_playoffs / run_cut.
+
+    Qualification itself is covered by accounts/tests/test_playoff_qualification.py.
+    These tests seed a frozen field via a mocked championship_bracket so they
+    stay fast and independent of the Season-Score / 125-pick eligibility bar.
+    """
+
     def setUp(self):
         self.season = settings.NFL_SEASON
         self.users = {}
@@ -73,6 +82,40 @@ class PlayoffFlowTests(TestCase):
             season=self.season, status=PlayoffEntry.ELIMINATED
         ).values_list('user__username', flat=True))
 
+    def _bracket(self, n=12, provisional=False):
+        """Synthetic championship_bracket payload for the first n test users."""
+        field = []
+        for i in range(1, n + 1):
+            user = self.users[i]
+            field.append({
+                'user': user,
+                'user_id': user.id,
+                'division': DIVISIONS[i % 8],
+                'record': '1-0-0',
+                'wins': 1,
+                'losses': 0,
+                'ties': 0,
+                'win_pct': 1.0,
+                'division_rank': None,
+                'qualification_route': 'Division qualifier',
+                'head_to_head_wins': 0,
+                'seed': i,
+            })
+        return {
+            'season': self.season,
+            'field_size': n,
+            'field': field,
+            'field_count': n,
+            'slots_open': 0,
+            'divisions': [],
+            'first_round': [],
+            'byes': [],
+            'round_one_winner_count': 0,
+            'bracket_size': 16,
+            'head_to_head_wildcard_spots': 0,
+            'is_provisional': provisional,
+        }
+
     def test_playoff_games_do_not_change_regular_season_records(self):
         self.pick(1, self.regular, 'home')
         playoff = self.game(19, 'wc')
@@ -81,27 +124,40 @@ class PlayoffFlowTests(TestCase):
         mine = [r for r in rows if r.user.id == self.users[1].id][0]
         self.assertEqual(mine.wins, 1)
 
-    def test_percentage_mode_takes_a_share_of_each_division(self):
+    def test_division_race_uses_dynamic_qualification(self):
+        """
+        division_playoff_race is driven by the dynamic algorithm, not the
+        legacy qualifier_percent setting. With only one regular-season game
+        nobody meets the activity/eligibility bar, so seats stay at 0.
+        """
         PlayoffSettings.objects.filter(season=self.season).update(qualifier_percent=50)
         for n in range(4):
             user = User.objects.create_user(username=f'east{n}')
-            PlayerIdentity.objects.create(user=user, division='AFC East', division_season=self.season)
+            PlayerIdentity.objects.create(
+                user=user, division='AFC East', division_season=self.season)
             Pick.objects.create(
-                user=user, game=self.regular, team_picked='home' if n < 2 else 'away')
+                user=user, game=self.regular,
+                team_picked='home' if n < 2 else 'away')
         race = division_playoff_race('AFC East', self.season)
-        # AFC East has 5 players (4 new + p08): half of 5 rounds up to 3.
+        # AFC East has 5 players (4 new + p08 from setUp).
         self.assertEqual(len(race['standings']), 5)
-        self.assertEqual(race['qualifiers_per_division'], 3)
+        self.assertEqual(race['qualifiers_per_division'], 0)
+        self.assertIn('active_players', race)
+        self.assertIn('field_size', race)
 
     def test_cannot_open_twice(self):
-        open_playoffs(self.season, force=True)
+        with patch('accounts.playoff_rounds.championship_bracket',
+                   return_value=self._bracket(12)):
+            open_playoffs(self.season, force=True)
         with self.assertRaises(PlayoffError):
             open_playoffs(self.season, force=True)
 
     def test_three_cuts_step_down_to_the_target(self):
         for i in range(1, 13):
             self.pick(i, self.regular, 'home')
-        self.assertEqual(open_playoffs(self.season), 12)
+        with patch('accounts.playoff_rounds.championship_bracket',
+                   return_value=self._bracket(12)):
+            self.assertEqual(open_playoffs(self.season), 12)
         self.assertEqual(get_config(self.season).rounds_cut, 0)
 
         # Round 1 (Wild Card): two games, home team wins both.
@@ -142,7 +198,15 @@ class PlayoffFlowTests(TestCase):
             run_cut(self.season)
 
     def test_cut_waits_for_the_games_to_finish(self):
-        open_playoffs(self.season, force=True)
+        with patch('accounts.playoff_rounds.championship_bracket',
+                   return_value=self._bracket(12)):
+            open_playoffs(self.season, force=True)
         self.game(19, 'live', final=False)
         with self.assertRaises(PlayoffError):
             run_cut(self.season)
+
+    def test_open_playoffs_rejects_empty_field(self):
+        """Real qualification with no eligible players must not open the field."""
+        with self.assertRaises(PlayoffError) as ctx:
+            open_playoffs(self.season, force=True)
+        self.assertIn('Nobody has qualified', str(ctx.exception))

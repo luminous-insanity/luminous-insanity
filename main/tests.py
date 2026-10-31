@@ -31,7 +31,7 @@ class HomePageTests(TestCase):
         response = self.client.get(reverse("home"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Pick every game")
-        self.assertContains(response, "Join for free")
+        self.assertContains(response, "Join free — start picking")
         self.assertNotContains(response, "Make your picks")
 
     def test_logged_in_players_get_pick_links_and_a_welcome(self):
@@ -60,10 +60,19 @@ class HomePageTests(TestCase):
         self.assertContains(self.client.get(reverse("home")), "tile-meta")
 
     def test_started_game_label_and_no_score_yet(self):
+        # No scores in DB yet → Live pill, no score digits.
         make_game(kickoff=ago(1))
         response = self.client.get(reverse("home"))
         self.assertContains(response, "Live")
         self.assertNotContains(response, "tile-score")
+
+    def test_live_game_with_scores_shows_them(self):
+        # Mid-game scores from sync should render (not only finals).
+        game = make_game(kickoff=ago(1), status="live", home_score=14, away_score=10)
+        response = self.client.get(reverse("home"))
+        self.assertContains(response, "Live")
+        self.assertContains(response, '<span class="tile-score has-score">14</span>')
+        self.assertContains(response, '<span class="tile-score has-score">10</span>')
 
     def test_final_game_shows_both_scores(self):
         make_final(make_game(), 27, 20)

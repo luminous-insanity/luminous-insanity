@@ -6,6 +6,7 @@ import logging
 from django.conf import settings
 from django.http import HttpResponseForbidden, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
 
 from .services import run_sync
 
@@ -13,9 +14,10 @@ log = logging.getLogger(__name__)
 
 
 @csrf_exempt
+@require_http_methods(["GET", "POST"])
 def sync_view(request):
     """
-    Called by an outside scheduler (e.g. cron-job.org) every ~30 minutes.
+    Called by an outside scheduler (e.g. cron-job.org) every ~15–30 minutes.
     The token goes in a request header, never in the URL, because URLs end up
     in server logs and scheduler job histories:
 
@@ -24,10 +26,16 @@ def sync_view(request):
 
     Safe to call as often as you like: it only spends API calls when a game
     has started and isn't final yet. Anyone without the token gets a 403.
+
+    Rate limiting is left to the external scheduler / host (PythonAnywhere
+    free tier already throttles). Application-level IP allow-lists are not
+    used because many cron services use rotating or shared egress IPs.
     """
     given = request.headers.get('X-Sync-Token', '')
     expected = settings.SYNC_TOKEN
     if not expected or not hmac.compare_digest(given.encode(), expected.encode()):
+        log.warning('Sync rejected: missing or invalid X-Sync-Token from %s',
+                    request.META.get('REMOTE_ADDR', '?'))
         return HttpResponseForbidden('Forbidden')
 
     try:
@@ -37,5 +45,13 @@ def sync_view(request):
         return JsonResponse({'ok': False, 'error': 'sync crashed, see server log'}, status=500)
 
     ok = not report['errors']
+    if not ok:
+        log.error('Sync finished with errors: %s', report.get('errors'))
+    else:
+        log.info('Sync ok: week=%s schedule=%s scores=%s',
+                 report.get('current_week'),
+                 report.get('schedule'),
+                 report.get('scores'))
+
     # 502 on API trouble so the scheduler's dashboard flags the run as failed.
     return JsonResponse({'ok': ok, **report}, status=200 if ok else 502)

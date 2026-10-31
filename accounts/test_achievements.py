@@ -18,20 +18,24 @@ class AchievementTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user('picker', password='test-pass-123')
 
-    def test_pick_maker_counts_only_graded_picks(self):
+    def test_play_caller_counts_picks_made(self):
         finished = make_final(make_game(), 21, 14)
         upcoming = make_game(week=2, game_id='UPCOMING-ACHIEVEMENT')
         Pick.objects.create(user=self.user, game=finished, team_picked=Pick.HOME)
         Pick.objects.create(user=self.user, game=upcoming, team_picked=Pick.HOME)
 
-        cards = {card['key']: card for card in refresh_achievement_unlocks(self.user)}
-        self.assertEqual(cards['pick_maker']['value'], 1)
-        self.assertTrue(cards['pick_maker']['milestones'][0]['unlocked'])
-        self.assertFalse(cards['pick_maker']['milestones'][1]['unlocked'])
+        cards = {
+            card['key']: card
+            for card in refresh_achievement_unlocks(self.user)['cards']
+        }
+        # Play Caller counts every pick submitted (graded or pending).
+        self.assertEqual(cards['play_caller']['value'], 2)
+        self.assertTrue(cards['play_caller']['milestones'][0]['unlocked'])
+        self.assertFalse(cards['play_caller']['milestones'][1]['unlocked'])
         self.assertEqual(
             AchievementUnlock.objects.filter(
                 user=self.user,
-                achievement_key="pick_maker",
+                achievement_key="play_caller",
             ).count(),
             1,
         )
@@ -40,12 +44,15 @@ class AchievementTests(TestCase):
         game = make_final(make_game(), 21, 14)
         Pick.objects.create(user=self.user, game=game, team_picked=Pick.HOME)
         refresh_achievement_unlocks(self.user)
-        unlock = AchievementUnlock.objects.get(user=self.user, achievement_key='pick_maker', level=1)
+        unlock = AchievementUnlock.objects.get(user=self.user, achievement_key='play_caller', level=1)
 
         # The record of the achievement is retained after current data changes.
         Pick.objects.filter(user=self.user, game=game).delete()
-        cards = {card['key']: card for card in refresh_achievement_unlocks(self.user)}
-        self.assertTrue(cards['pick_maker']['milestones'][0]['unlocked'])
+        cards = {
+            card['key']: card
+            for card in refresh_achievement_unlocks(self.user)['cards']
+        }
+        self.assertTrue(cards['play_caller']['milestones'][0]['unlocked'])
         self.assertEqual(AchievementUnlock.objects.get(pk=unlock.pk).pk, unlock.pk)
 
     def test_achievements_page_requires_login(self):

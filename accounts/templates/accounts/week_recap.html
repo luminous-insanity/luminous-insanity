@@ -1,0 +1,91 @@
+{% extends 'main/base.html' %}
+{% block title %}Week {{ recap.week }} recap | GameDayPicks{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Week {{ recap.week }} recap</h1>
+        <p>{{ selected_season }} season{% if recap.week_complete %} · final{% else %} · in progress{% endif %}</p>
+    </div>
+    <form method="get" class="inline-form">
+        <input type="hidden" name="season" value="{{ selected_season }}">
+        <label for="week" class="visually-hidden">Week</label>
+        <select name="week" id="week" onchange="this.form.submit()">
+            {% for w in weeks %}
+                <option value="{{ w }}" {% if w == recap.week %}selected{% endif %}>Week {{ w }}</option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+
+<section class="cmd-hero" style="margin-bottom:18px">
+    <div class="cmd-hero-topline">
+        <span class="cmd-kicker">YOUR WEEK</span>
+        {% if recap.week_complete %}<span class="pill pill-gold">FINAL</span>{% else %}<span class="pill">{{ recap.games_final }}/{{ recap.games_total }} final</span>{% endif %}
+    </div>
+    <h1>{{ recap.record }}</h1>
+    <p class="hero-sub">
+        {{ recap.picked_count }} of {{ recap.games_total }} picked
+        {% if recap.confidence_points %} · {{ recap.confidence_points }} confidence pts{% endif %}
+        {% if recap.underdog_locks %} · {{ recap.underdog_locks }} dog locks{% endif %}
+    </p>
+    <div class="cmd-stats-row">
+        <div class="cmd-stat"><div class="label">Wins</div><div class="value win">{{ recap.wins }}</div></div>
+        <div class="cmd-stat"><div class="label">Losses</div><div class="value loss">{{ recap.losses }}</div></div>
+        <div class="cmd-stat"><div class="label">Ties</div><div class="value">{{ recap.ties }}</div></div>
+        {% if recap.pending %}<div class="cmd-stat"><div class="label">Pending</div><div class="value">{{ recap.pending }}</div></div>{% endif %}
+    </div>
+</section>
+
+{% if recap.highlights %}
+<section class="section-card" style="margin-bottom:16px">
+    <h2>Highlights</h2>
+    <ul class="activity-list">
+        {% for h in recap.highlights %}
+        <li class="activity-item">
+            <span class="activity-icon">{{ h.icon }}</span>
+            <div class="activity-body"><p>{{ h.text }}</p></div>
+        </li>
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}
+
+{% if recap.friend_rows %}
+<section class="section-card" style="margin-bottom:16px">
+    <div class="section-head">
+        <h2>Friends this week</h2>
+        <a href="{% url 'leaderboard' %}?tab=weekly&season={{ selected_season }}&week={{ recap.week }}&filter=friends">Full race</a>
+    </div>
+    <ol class="race-list">
+        {% for row in recap.friend_rows %}
+        <li class="race-row {% if row.is_me %}is-me{% endif %}">
+            <span class="race-rank">{{ row.rank }}</span>
+            <span class="race-name">{{ row.user.username }}{% if row.is_me %} · you{% endif %}</span>
+            <span class="race-record">{{ row.wins }}–{{ row.losses }}–{{ row.ties }}</span>
+        </li>
+        {% endfor %}
+    </ol>
+</section>
+{% endif %}
+
+{% if recap.challenges %}
+<section class="section-card" style="margin-bottom:16px">
+    <h2>Challenges</h2>
+    <ul class="stack" style="list-style:none;padding:0">
+        {% for c in recap.challenges %}
+        <li class="row">
+            <span>{{ c.challenger.username }} vs {{ c.opponent.username }} · {{ c.get_status_display }}</span>
+            <a class="btn btn-sm btn-quiet" href="{% url 'challenge_detail' c.id %}">View</a>
+        </li>
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}
+
+<p class="back-link">
+    <a href="{% url 'dashboard' %}">&larr; Dashboard</a>
+    · <a href="{% url 'picks' %}?season={{ selected_season }}&amp;week={{ recap.week }}">Picks</a>
+    · <a href="{% url 'share_hub' %}">Share moments</a>
+</p>
+{% endblock %}

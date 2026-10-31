@@ -220,9 +220,10 @@ class GamesNeedingScoresTests(TestCase):
         make_final(make_game(game_id="G1", kickoff=ago(5)), 10, 3)
         self.assertEqual(self.ids(), set())
 
-    def test_live_game_is_rechecked_every_ten_minutes(self):
-        make_game(game_id="JUST_CHECKED", kickoff=ago(1), scores_checked_at=ago(5 / 60))
-        make_game(game_id="DUE", kickoff=ago(1), scores_checked_at=ago(15 / 60))
+    def test_live_game_is_rechecked_every_fifteen_minutes(self):
+        # LIVE_RECHECK is 15 minutes (aligned with free cron interval).
+        make_game(game_id="JUST_CHECKED", kickoff=ago(1), scores_checked_at=ago(10 / 60))
+        make_game(game_id="DUE", kickoff=ago(1), scores_checked_at=ago(20 / 60))
         self.assertEqual(self.ids(), {"DUE"})
 
     def test_game_older_than_eight_hours_is_rechecked_daily(self):
@@ -337,14 +338,136 @@ class RunSyncTests(TestCase):
         self.assertEqual(report["schedule_weeks"], [1])
         self.assertEqual(Game.objects.get(game_id="G1").kickoff, new_kickoff)
 
-    def test_no_api_calls_after_the_regular_season_ends(self):
-        make_final(make_game(week=18, game_date=timezone.localdate() - timedelta(days=1)), 20, 10)
-        fake = FakeApi()
+    def test_opens_playoffs_after_regular_season_ends(self):
+        make_final(
+            make_game(
+                week=18,
+                game_id="W18",
+                game_date=timezone.localdate() - timedelta(days=1),
+            ),
+            20,
+            10,
+        )
+        fake = FakeApi(
+            schedules={
+                1: [raw_game("WC1", "KC", "BAL", hours_from_now(48))]
+            }
+        )
+
         self.run_with(fake)
+
+        playoff_game = Game.objects.get(game_id="WC1")
+        self.assertEqual(playoff_game.week, 19)
+        self.assertEqual(playoff_game.season, 2026)
+        self.assertEqual(fake.calls, [("getNFLGamesForWeek", 1)])
+
+    def test_does_not_open_next_playoff_round_until_current_round_is_final(self):
+        make_game(
+            week=19,
+            game_id="WC1",
+            game_date=timezone.localdate() + timedelta(days=2),
+        )
+        fake = FakeApi()
+
+        self.run_with(fake)
+
+        self.assertFalse(Game.objects.filter(week=20).exists())
         self.assertEqual(fake.calls, [])
 
+    def test_does_not_open_week_23_after_super_bowl_is_final(self):
+        make_final(
+            make_game(
+                week=22,
+                game_id="SB",
+                game_date=timezone.localdate() - timedelta(days=1),
+            ),
+            29,
+            13,
+        )
+        fake = FakeApi()
 
-# ----------------------------------------------------------- the sync URL --
+        self.run_with(fake)
+
+        self.assertFalse(Game.objects.filter(week=23).exists())
+        self.assertEqual(fake.calls, [])
+
+    def test_opens_divisional_round_after_wild_card_is_final(self):
+        make_final(
+            make_game(
+                week=19,
+                game_id="WC1",
+                game_date=timezone.localdate() - timedelta(days=1),
+            ),
+            24,
+            20,
+        )
+        fake = FakeApi(
+            schedules={
+                2: [raw_game("DIV1", "BUF", "DEN", hours_from_now(48))]
+            }
+        )
+
+        report = self.run_with(fake)
+
+        divisional_game = Game.objects.get(game_id="DIV1")
+        self.assertEqual(divisional_game.week, 20)
+        self.assertEqual(divisional_game.season, 2026)
+        self.assertEqual(report["schedule_weeks"], [20])
+        self.assertEqual(fake.calls, [("getNFLGamesForWeek", 2)])
+
+
+    def test_opens_conference_championship_after_divisional_round_is_final(self):
+        make_final(
+            make_game(
+                week=20,
+                game_id="DIV1",
+                game_date=timezone.localdate() - timedelta(days=1),
+            ),
+            27,
+            24,
+        )
+        fake = FakeApi(
+            schedules={
+                3: [raw_game("CC1", "LAR", "SEA", hours_from_now(48))]
+            }
+        )
+
+        report = self.run_with(fake)
+
+        championship_game = Game.objects.get(game_id="CC1")
+        self.assertEqual(championship_game.week, 21)
+        self.assertEqual(championship_game.season, 2026)
+        self.assertEqual(report["schedule_weeks"], [21])
+        self.assertEqual(fake.calls, [("getNFLGamesForWeek", 3)])
+
+
+    def test_opens_super_bowl_after_conference_championship_is_final(self):
+        make_final(
+            make_game(
+                week=21,
+                game_id="CC1",
+                game_date=timezone.localdate() - timedelta(days=1),
+            ),
+            31,
+            24,
+        )
+        fake = FakeApi(
+            schedules={
+                4: [raw_game("SB", "SEA", "NE", hours_from_now(48))]
+            }
+        )
+
+        report = self.run_with(fake)
+
+        super_bowl = Game.objects.get(game_id="SB")
+        self.assertEqual(super_bowl.week, 22)
+        self.assertEqual(super_bowl.season, 2026)
+        self.assertEqual(report["schedule_weeks"], [22])
+        self.assertEqual(fake.calls, [("getNFLGamesForWeek", 4)])
+
+
+# -------------------- the sync URL -----------------------------------------
+
 
 @override_settings(**SETTINGS)
 class SyncViewTests(TestCase):

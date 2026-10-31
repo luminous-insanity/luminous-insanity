@@ -1,0 +1,91 @@
+{% extends 'main/base.html' %}
+
+{% block title %}Relay Wars Matchup | GameDayPicks{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div><h1>{{ match.team_a.name }} vs {{ match.team_b.name }}</h1><p>{{ match.season }} · Week {{ match.week }} · Draft locks at {{ match.lock_at|date:"D M j, g:i A" }}</p></div>
+</div>
+
+<div class="stat-grid stat-grid-2">
+    <section class="card" style="padding:18px;">
+        <h2>{{ match.team_a.name }}</h2>
+        <div class="stat-num">{{ side_a.best_chain }}</div><span class="stat-label">Best chain</span>
+        <p>Current: <strong>{{ side_a.current_chain }}</strong> · Ability tokens: <strong>{{ side_a.ability_tokens }}</strong></p>
+        {% for member in match.team_a.active_members %}<span class="pill">{{ member.user.username }}</span> {% endfor %}
+    </section>
+    <section class="card" style="padding:18px;">
+        <h2>{{ match.team_b.name }}</h2>
+        <div class="stat-num">{{ side_b.best_chain }}</div><span class="stat-label">Best chain</span>
+        <p>Current: <strong>{{ side_b.current_chain }}</strong> · Ability tokens: <strong>{{ side_b.ability_tokens }}</strong></p>
+        {% for member in match.team_b.active_members %}<span class="pill">{{ member.user.username }}</span> {% endfor %}
+    </section>
+</div>
+
+<section class="card" style="padding:18px; margin:18px 0;">
+    <h2>Draft board</h2>
+    <p class="muted">Teams alternate picks. Every selected game and winner is public and immediately removed from the available games.</p>
+    {% if match.status == 'complete' %}<div class="alert alert-info">{% if match.is_tied %}The matchup ended in a tie: both teams' best chains were {{ side_a.best_chain }}.{% else %}<strong>{{ match.winner_team.name }} wins!</strong> Best chain: {% if match.winner_team.id == match.team_a.id %}{{ side_a.best_chain }}{% else %}{{ side_b.best_chain }}{% endif %}.{% endif %}</div>{% endif %}
+    {% if next_turn and is_draft_open %}
+        <div class="alert alert-info"><strong>Pick {{ next_turn.position }}:</strong> {{ next_turn.team.name }} — {{ next_turn.assigned_member.username }}{% if next_turn.assigned_member_id != request.user.id %} (a teammate may submit this pick for them){% endif %}</div>
+        {% if next_turn.team_id == my_team.id %}
+            <form method="post" style="display:grid; gap:12px;">
+                {% csrf_token %}<input type="hidden" name="turn_id" value="{{ next_turn.pk }}">
+                <label>Choose an available game
+                    <select name="game_id" required>
+                        <option value="">Select game</option>
+                        {% for game in available_games %}<option value="{{ game.game_id }}">{{ game.away_team }} at {{ game.home_team }} — {{ game.kickoff|date:"D g:i A" }}</option>{% endfor %}
+                    </select>
+                </label>
+                <label>Pick the winner
+                    <select name="side" required><option value="">Select winner</option><option value="away">Away team wins</option><option value="home">Home team wins</option></select>
+                </label>
+                <button class="btn btn-red" name="action" value="pick">Submit team pick</button>
+                <button class="btn" name="action" value="skip" formnovalidate>Skip this turn</button>
+            </form>
+        {% else %}<p>Waiting for the other team to make its selection.</p>{% endif %}
+    {% elif not draft_complete and not is_draft_open %}
+        <p>The event locked at the first kickoff. Unfilled turns were skipped.</p>
+    {% else %}<p><strong>Draft complete.</strong> The ability phase is open until each targeted game's kickoff.</p>{% endif %}
+
+    <h3>Draft order</h3>
+    <ol>{% for turn in turns %}<li>{{ turn.team.name }} — {{ turn.assigned_member.username }}: {% if turn.skipped %}<span class="muted">Skipped</span>{% elif turn.pick %}{{ turn.pick.game.away_team }} at {{ turn.pick.game.home_team }} — {{ turn.pick.picked_team }}{% else %}<span class="muted">Waiting</span>{% endif %}</li>{% endfor %}</ol>
+    <h3>Selected games</h3>
+    {% if picks %}
+        <div style="display:grid; gap:10px;">
+        {% for pick in picks %}
+            <article class="card" style="padding:12px;">
+                <strong>{{ pick.game.away_team }} at {{ pick.game.home_team }}</strong>
+                <span> — {{ pick.picked_team }}</span>
+                <p class="muted">{{ pick.team.name }} · {{ pick.assigned_player.username }}{% if pick.selected_by_id != pick.assigned_player_id %} (submitted by {{ pick.selected_by.username }}){% endif %} · {{ pick.game.kickoff|date:"D M j, g:i A" }}</p>
+                {% if pick.result == 'win' %}<strong class="text-success">WIN</strong>{% elif pick.result == 'loss' %}<strong class="text-danger">LOSS</strong>{% elif pick.result == 'tie' %}<strong>TIE</strong>{% else %}<span class="muted">Pending</span>{% endif %}
+                {% if draft_complete and not pick.game.has_started %}
+                    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
+                        {% if pick.team_id == my_team.id %}<form method="post">{% csrf_token %}<input type="hidden" name="pick_id" value="{{ pick.pk }}"><input type="hidden" name="kind" value="protect"><button class="btn btn-sm" name="action" value="ability" type="submit">Propose Protection</button></form>
+                        {% else %}<form method="post">{% csrf_token %}<input type="hidden" name="pick_id" value="{{ pick.pk }}"><input type="hidden" name="kind" value="jinx"><button class="btn btn-sm" name="action" value="ability" type="submit">Propose Jinx</button></form>{% endif %}
+                    </div>
+                {% endif %}
+            </article>
+        {% endfor %}
+        </div>
+    {% else %}<p>No games selected yet.</p>{% endif %}
+</section>
+
+{% if abilities %}
+<section class="card" style="padding:18px; margin:18px 0;">
+    <h2>Team abilities</h2>
+    {% for ability in abilities %}
+        <article style="padding:10px 0; border-bottom:1px solid var(--border);">
+            <strong>{{ ability.get_kind_display }} — {{ ability.target_pick.game.away_team }} at {{ ability.target_pick.game.home_team }}</strong>
+            <span class="muted"> · {{ ability.get_status_display }} · Proposed by {{ ability.proposed_by.username }}</span>
+            <p class="muted">{{ ability.votes.count }} vote(s); {{ ability.target_pick.game.kickoff|date:"D g:i A" }} kickoff.</p>
+            {% if ability.status == 'pending' and ability.team_id == my_team.id %}
+                <form method="post" style="display:flex; gap:8px;">{% csrf_token %}<input type="hidden" name="action" value="vote"><input type="hidden" name="ability_id" value="{{ ability.pk }}"><button class="btn btn-sm btn-red" name="vote" value="yes" type="submit">Approve</button><button class="btn btn-sm" name="vote" value="no" type="submit">Reject</button></form>
+            {% endif %}
+        </article>
+    {% endfor %}
+</section>
+{% endif %}
+
+<p class="back-link"><a href="{% url 'relaywars:home' %}">&larr; Back to Relay Wars</a></p>
+{% endblock %}

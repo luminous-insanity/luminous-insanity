@@ -1,12 +1,6 @@
 # api/admin.py
 from django.contrib import admin
-from .models import Game, QuarterScore, Score, NFLWeek
-
-
-class ScoreAdmin(admin.ModelAdmin):
-    list_display = ('game_id', 'home_score', 'away_score', 'game_date')
-    search_fields = ('game_id',)
-    list_filter = ('game_date',)
+from .models import Game, QuarterScore
 
 
 class QuarterScoreInline(admin.TabularInline):
@@ -24,5 +18,6 @@ class GameAdmin(admin.ModelAdmin):
     inlines = [QuarterScoreInline]
 
 
-admin.site.register(Score, ScoreAdmin)
-admin.site.register(NFLWeek)
+# NFLWeek and Score are legacy (see models.py comments).
+# Tables and historical rows are preserved; they are no longer registered in admin
+# because runtime code uses Game + api.services.current_week() exclusively.

@@ -1,6 +1,23 @@
 {% extends 'main/base.html' %}
 
-{% block title %}Challenge | GameDayPicks{% endblock %}
+{% block title %}Challenge | GameDayPicks
+{% if rivalry and rivalry.timeline %}
+<section class="section-card" style="margin-top:20px">
+    <h2>Rivalry timeline · {{ rivalry.season }}</h2>
+    <p class="muted">{{ challenge.challenger.username }} {{ rivalry.a_wins }} – {{ rivalry.b_wins }} {{ challenge.opponent.username }}{% if rivalry.ties %} · {{ rivalry.ties }} tied week{{ rivalry.ties|pluralize }}{% endif %}</p>
+    <ol class="race-list">
+        {% for item in rivalry.timeline %}
+        <li class="race-row">
+            <span class="race-rank">W{{ item.week }}</span>
+            <span class="race-name">{{ challenge.challenger.username }} {{ item.a_record }} · {{ challenge.opponent.username }} {{ item.b_record }}</span>
+            <span class="race-record">{% if item.result == 'tie' %}Tie{% elif item.winner %}{{ item.winner.username }}{% else %}—{% endif %}</span>
+        </li>
+        {% endfor %}
+    </ol>
+</section>
+{% endif %}
+
+{% endblock %}
 
 {% block content %}
 <div class="page-head">

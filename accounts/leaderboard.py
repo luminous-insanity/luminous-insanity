@@ -84,7 +84,7 @@ def season_is_finalized(season):
     ).exists():
         return False
     loaded_weeks = set(games.order_by().values_list('week', flat=True).distinct())
-    return set(range(1, MAX_WEEK + 1)).issubset(loaded_weeks)
+    return set(range(1, 19)).issubset(loaded_weeks)
 
 
 # ------------------------------------------------------ who is on the board --

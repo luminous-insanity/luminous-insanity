@@ -1,0 +1,175 @@
+{% extends 'main/base.html' %}
+{% block title %}Crossfire · Week {{ selected_week }}{% endblock %}
+
+{% block content %}
+<section class="xf-hero">
+    <div class="xf-hero-copy">
+        <p class="xf-kicker">Signature competition</p>
+        <h1>Crossfire</h1>
+        <p class="xf-lede">
+            Hunt another player’s pick on a specific game. You only score a
+            <strong>hit</strong> when you’re right and they’re wrong.
+            Crossfire never touches your W–L–T record — it’s a pure accuracy duel.
+        </p>
+    </div>
+    {% if board.tokens %}
+    <div class="xf-tokens" aria-label="Tokens remaining">
+        <span class="xf-token-count">{{ board.tokens.left }}</span>
+        <span class="xf-token-label">of {{ board.tokens.max }} tokens left this week</span>
+    </div>
+    {% endif %}
+</section>
+
+<nav class="xf-weeks" aria-label="Week switcher">
+    {% for w in active_weeks %}
+        <a href="?week={{ w }}" class="xf-week {% if w == selected_week %}is-active{% endif %}">W{{ w }}</a>
+    {% endfor %}
+</nav>
+
+<div class="xf-grid">
+    <section class="xf-card xf-wanted" aria-labelledby="wanted-title">
+        <header class="xf-card-head">
+            <h2 id="wanted-title">Most Wanted</h2>
+            <p>Picks drawing the most Crossfire this week.</p>
+        </header>
+        {% if board.most_wanted %}
+            <ul class="xf-wanted-list">
+                {% for item in board.most_wanted %}
+                <li class="xf-wanted-row">
+                    <div class="xf-wanted-main">
+                        <strong>{{ item.target.username }}</strong>
+                        <span class="xf-muted">{{ item.game.away_team }} @ {{ item.game.home_team }}</span>
+                        <span class="xf-side">on {{ item.target_side }}</span>
+                    </div>
+                    <div class="xf-wanted-meta">
+                        <span class="xf-heat" title="Crossfires aimed here">{{ item.count }}× fire</span>
+                        {% if item.pending %}
+                            <span class="pill pill-live">Live</span>
+                        {% elif item.hits_against %}
+                            <span class="pill pill-final">{{ item.hits_against }} hit{{ item.hits_against|pluralize }}</span>
+                        {% else %}
+                            <span class="pill">Survived</span>
+                        {% endif %}
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="xf-empty">No Crossfires yet this week. Make opposite picks, then open fire.</p>
+        {% endif %}
+    </section>
+
+    <section class="xf-card" aria-labelledby="sharp-title">
+        <header class="xf-card-head">
+            <h2 id="sharp-title">Week {{ selected_week }} sharpshooters</h2>
+            <p>Ranked by hits landed, then fewest misses.</p>
+        </header>
+        {% if board.sharpshooters %}
+            <ol class="xf-sharp-list">
+                {% for s in board.sharpshooters %}
+                <li>
+                    <span class="xf-rank">{{ forloop.counter }}</span>
+                    <span class="xf-name">{{ s.user.username }}</span>
+                    <span class="xf-record">
+                        <strong>{{ s.hits }}</strong> hit{% if s.hits != 1 %}s{% endif %}
+                        · {{ s.misses }} miss{% if s.misses != 1 %}es{% endif %}
+                        {% if s.pending %} · {{ s.pending }} pending{% endif %}
+                    </span>
+                </li>
+                {% endfor %}
+            </ol>
+        {% else %}
+            <p class="xf-empty">No shots fired yet.</p>
+        {% endif %}
+    </section>
+
+    <section class="xf-card xf-span" aria-labelledby="mine-title">
+        <header class="xf-card-head">
+            <h2 id="mine-title">Your Crossfires</h2>
+            <p>Shots you fired and heat aimed at you.</p>
+        </header>
+        <div class="xf-split">
+            <div>
+                <h3>Fired</h3>
+                {% if board.my_fired %}
+                    <ul class="xf-shot-list">
+                        {% for g in board.my_fired %}
+                        <li class="xf-shot xf-{{ g.result }}">
+                            <div>
+                                <strong>{{ g.crossfire.target.username }}</strong>
+                                <span class="xf-muted">{{ g.crossfire.game.away_team }} @ {{ g.crossfire.game.home_team }}</span>
+                            </div>
+                            <div class="xf-shot-actions">
+                                <span class="xf-result">{{ g.result }}</span>
+                                {% if g.result == 'pending' %}
+                                <form method="post" action="{% url 'crossfire_cancel' g.crossfire.id %}" class="xf-inline-form">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="week" value="{{ selected_week }}">
+                                    <button type="submit" class="xf-cancel">Cancel</button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="xf-empty">You haven’t fired this week.</p>
+                {% endif %}
+            </div>
+            <div>
+                <h3>Incoming</h3>
+                {% if board.my_received %}
+                    <ul class="xf-shot-list">
+                        {% for g in board.my_received %}
+                        <li class="xf-shot xf-{{ g.result }}">
+                            <div>
+                                <strong>{{ g.crossfire.attacker.username }}</strong>
+                                <span class="xf-muted">on your {{ g.crossfire.target_side }} pick · {{ g.crossfire.game.away_team }} @ {{ g.crossfire.game.home_team }}</span>
+                            </div>
+                            <span class="xf-result">{{ g.result }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="xf-empty">Nobody is hunting you yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+
+    <section class="xf-card xf-span" aria-labelledby="how-title">
+        <header class="xf-card-head">
+            <h2 id="how-title">How to open fire</h2>
+        </header>
+        <ol class="xf-howto">
+            <li>Make your pick on a game (opposite of the player you want to hunt).</li>
+            <li>From that game’s aim page, choose a target who picked the other side.</li>
+            <li>Each hit is a pure skill flex. Misses don’t hurt your season record.</li>
+        </ol>
+        <p class="xf-cta-row">
+            <a class="btn btn-red" href="{% url 'picks' %}?week={{ selected_week }}">Go to picks to aim</a>
+        </p>
+    </section>
+
+    {% if season_leaders %}
+    <section class="xf-card xf-span" aria-labelledby="season-title">
+        <header class="xf-card-head">
+            <h2 id="season-title">Season sharpshooters</h2>
+            <p>{{ selected_season }} hits across every week.</p>
+        </header>
+        <ol class="xf-sharp-list xf-season">
+            {% for s in season_leaders %}
+            <li>
+                <span class="xf-rank">{{ forloop.counter }}</span>
+                <span class="xf-name">{{ s.user.username }}</span>
+                <span class="xf-record">
+                    <strong>{{ s.hits }}</strong> hits · {{ s.misses }} misses
+                    {% if s.accuracy is not None %} · {{ s.accuracy|floatformat:0 }}%{% endif %}
+                </span>
+            </li>
+            {% endfor %}
+        </ol>
+    </section>
+    {% endif %}
+</div>
+{% endblock %}

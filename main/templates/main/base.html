@@ -1,10 +1,10 @@
 {% load static %}<!DOCTYPE html>
-<html lang="en" data-theme="light"{% if team_theme.enabled %} data-team-theme="true" style="--primary: {{ team_theme.primary }}; --link: {{ team_theme.primary }}; --focus: {{ team_theme.secondary }}; --on-primary: {{ team_theme.on_primary }}; --team-accent: {{ team_theme.secondary }};"{% else %} data-team-theme="false"{% endif %}>
+<html lang="en" data-theme="dark"{% if team_theme.enabled %} data-team-theme="true" style="--primary: {{ team_theme.primary }}; --link: {{ team_theme.primary }}; --focus: {{ team_theme.secondary }}; --on-primary: {{ team_theme.on_primary }}; --team-accent: {{ team_theme.secondary }};"{% else %} data-team-theme="false"{% endif %}>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="color-scheme" content="light dark">
-    <meta name="theme-color" content="#0a1f44">
+    <meta name="theme-color" content="#060e18">
     <title>{% block title %}GameDayPicks{% endblock %}</title>
     <script>
         /* Apply the saved theme before first paint so the page never flashes. */
@@ -60,7 +60,11 @@
                             <a href="{% url 'playoffs' %}">Playoff Bracket</a>
                             <a href="{% url 'squares' %}">Super Bowl Squares</a>
                             <a href="{% url 'achievements' %}">Achievements</a>
+                            <a href="{% url 'week_recap' %}">Week recap</a>
+                            <a href="{% url 'share_hub' %}">Share moments</a>
                             <a href="{% url 'challenges' %}">Challenges</a>
+                            <a href="{% url 'crossfire' %}">Crossfire</a>
+                            <a href="{% url 'relaywars:home' %}">Relay Wars</a>
                             <a href="{% url 'logout' %}">Log out</a>
                         </div>
                     </details>

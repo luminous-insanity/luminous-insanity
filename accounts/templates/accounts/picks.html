@@ -63,8 +63,10 @@
                     <span class="pill pill-live">Live</span>
                 {% else %}
                     <span>{{ game_info.kickoff_label }}</span>
-                    {% if not game_info.pick_available %}<span class="pill">Locked</span>{% endif %}
+                    {% if not game_info.pick_available %}<span class="pill">Locked</span>{% elif game_info.hours_to_lock is not None and game_info.hours_to_lock <= 24 %}<span class="pill pill-live">Locks in {{ game_info.hours_to_lock }}h</span>{% endif %}
                 {% endif %}
+                {% if game_info.away_is_underdog %}<span class="pill pill-dog">{{ game_info.game.away_team }} dog</span>{% endif %}
+                {% if game_info.home_is_underdog %}<span class="pill pill-dog">{{ game_info.game.home_team }} dog</span>{% endif %}
             </div>
 
             {% if game_info.pick_available %}
@@ -92,6 +94,13 @@
                         </button>
                     </div>
                     <input type="hidden" name="team_picked" value="{{ game_info.pick_status|default:'' }}">
+                    <input type="hidden" name="confidence" value="{{ game_info.pick_confidence|default:'' }}" class="confidence-input">
+                    <div class="confidence-row" role="group" aria-label="Confidence level">
+                        <span class="confidence-label">Confidence</span>
+                        <button type="button" class="confidence-chip {% if game_info.pick_confidence == 1 %}is-active{% endif %}" data-confidence="1" title="Lean">Lean</button>
+                        <button type="button" class="confidence-chip {% if game_info.pick_confidence == 2 %}is-active{% endif %}" data-confidence="2" title="Solid">Solid</button>
+                        <button type="button" class="confidence-chip {% if game_info.pick_confidence == 3 %}is-active{% endif %}" data-confidence="3" title="Lock">Lock</button>
+                    </div>
                 </form>
             {% else %}
                 <div class="match-teams">
@@ -111,6 +120,9 @@
             <div class="match-foot">
                 {% if game_info.pick_team %}
                     <span>Your pick: <strong>{{ game_info.pick_team }}</strong></span>
+                    {% if game_info.pick_available %}
+                        <a class="xf-pick-aim" href="{% url 'crossfire_aim' game_info.game.game_id %}">Crossfire →</a>
+                    {% endif %}
                 {% elif game_info.pick_available %}
                     <span class="muted">Not picked yet</span>
                 {% else %}
@@ -299,6 +311,27 @@ document.addEventListener("DOMContentLoaded", function () {
         const homeColors = teamColors[homeCode];
         if (awayColors) section.style.setProperty("--away-team-color", awayColors[0]);
         if (homeColors) section.style.setProperty("--home-team-color", homeColors[0]);
+    });
+
+    // Confidence chips — set value without submitting until a team is chosen.
+    document.querySelectorAll(".confidence-chip").forEach(function (chip) {
+        chip.addEventListener("click", function (e) {
+            e.preventDefault();
+            const form = this.closest(".match-form");
+            if (!form) return;
+            const input = form.querySelector(".confidence-input");
+            if (!input) return;
+            const value = this.dataset.confidence;
+            // Toggle off if already active
+            if (input.value === value) {
+                input.value = "";
+                form.querySelectorAll(".confidence-chip").forEach(function (c) { c.classList.remove("is-active"); });
+            } else {
+                input.value = value;
+                form.querySelectorAll(".confidence-chip").forEach(function (c) { c.classList.remove("is-active"); });
+                this.classList.add("is-active");
+            }
+        });
     });
 
     // Select a team and submit the existing Django pick form.

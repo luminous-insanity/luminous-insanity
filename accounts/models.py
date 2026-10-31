@@ -13,12 +13,29 @@ class Pick(models.Model):
         (AWAY, 'Away Team'),
     ]
 
+    # Optional confidence: 1 = lean, 2 = solid, 3 = lock.
+    # Does not change W-L-T; powers Confidence Points and underdog glory.
+    CONFIDENCE_LEAN = 1
+    CONFIDENCE_SOLID = 2
+    CONFIDENCE_LOCK = 3
+    CONFIDENCE_CHOICES = [
+        (CONFIDENCE_LEAN, 'Lean'),
+        (CONFIDENCE_SOLID, 'Solid'),
+        (CONFIDENCE_LOCK, 'Lock'),
+    ]
+
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     game = models.ForeignKey(Game, on_delete=models.CASCADE)
     team_picked = models.CharField(
         max_length=10,
         choices=TEAM_CHOICES,
         default=HOME,
+    )
+    confidence = models.PositiveSmallIntegerField(
+        choices=CONFIDENCE_CHOICES,
+        null=True,
+        blank=True,
+        help_text='Optional. Higher confidence on correct picks earns Confidence Points.',
     )
 
     class Meta:
@@ -57,6 +74,7 @@ class FriendRequest(models.Model):
         default=PENDING,
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    receiver_seen = models.BooleanField(default=False)
 
     class Meta:
         constraints = [
@@ -193,6 +211,7 @@ class PerformanceReaction(models.Model):
     week = models.PositiveSmallIntegerField()
     emoji = models.CharField(max_length=8, choices=choices)
     created_at = models.DateTimeField(auto_now=True)
+    is_read = models.BooleanField(default=False)
 
     class Meta:
         constraints = [
@@ -203,6 +222,45 @@ class PerformanceReaction(models.Model):
 
     def __str__(self):
         return f'{self.reactor} reacted {self.emoji} to {self.player} (S{self.season} W{self.week})'
+
+
+
+
+class GameReaction(models.Model):
+    """Live / post-game emoji reaction to a specific NFL game.
+
+    Distinct from PerformanceReaction (which is about a friend's weekly record).
+    These fuel the in-game energy feed while games are live or just finished.
+    """
+    FIRE = '🔥'
+    SHOCK = '😱'
+    CLUTCH = '💪'
+    HEARTBREAK = '💔'
+    PARTY = '🎉'
+    choices = [
+        (FIRE, 'Fire'),
+        (SHOCK, 'Shock'),
+        (CLUTCH, 'Clutch'),
+        (HEARTBREAK, 'Heartbreak'),
+        (PARTY, 'Party'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='game_reactions')
+    game = models.ForeignKey(Game, on_delete=models.CASCADE, related_name='reactions')
+    emoji = models.CharField(max_length=8, choices=choices)
+    created_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'game'],
+                name='unique_user_game_reaction',
+            ),
+        ]
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.user} {self.emoji} on {self.game_id}'
 
 
 class PlayerIdentity(models.Model):
@@ -216,6 +274,10 @@ class PlayerIdentity(models.Model):
         User, on_delete=models.CASCADE, related_name='player_identity'
     )
     favorite_team = models.CharField(max_length=3, blank=True, default='')
+    active_title = models.CharField(
+        max_length=40, blank=True, default='',
+        help_text='Unlockable title shown on profile and leaderboard.',
+    )
     division = models.CharField(max_length=12, blank=True, default='')
     division_season = models.PositiveSmallIntegerField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -340,3 +402,44 @@ class BoardSquare(models.Model):
     def __str__(self):
         return f'Square (row {self.row}, col {self.col}): {self.owner or "open"}'
 
+
+class Crossfire(models.Model):
+    """A directed bet that another player's pick on a specific game is wrong.
+
+    Does not affect W-L-T standings. Outcomes are derived from final scores
+    the same way standings are — nothing is stored as a running total.
+    """
+    season = models.PositiveIntegerField(db_index=True)
+    week = models.PositiveIntegerField(db_index=True)
+    attacker = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='crossfires_fired',
+    )
+    target = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='crossfires_received',
+    )
+    game = models.ForeignKey(Game, on_delete=models.CASCADE, related_name='crossfires')
+    # Snapshot of sides at the moment the crossfire was placed so later pick
+    # changes cannot rewrite history. Attacker must be opposite of target.
+    attacker_side = models.CharField(max_length=10, choices=Pick.TEAM_CHOICES)
+    target_side = models.CharField(max_length=10, choices=Pick.TEAM_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['attacker', 'game'],
+                name='unique_crossfire_per_attacker_game',
+            ),
+            models.CheckConstraint(
+                check=~models.Q(attacker=models.F('target')),
+                name='crossfire_not_self',
+            ),
+        ]
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['season', 'week'], name='acc_cf_szn_wk_idx'),
+            models.Index(fields=['target', 'season', 'week'], name='acc_cf_tgt_szn_wk_idx'),
+        ]
+
+    def __str__(self):
+        return f'{self.attacker_id} → {self.target_id} on {self.game_id} (W{self.week})'

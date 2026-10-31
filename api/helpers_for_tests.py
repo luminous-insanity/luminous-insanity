@@ -86,7 +86,8 @@ class FakeApi:
         if self.error:
             raise ApiError(self.error)
         if endpoint == "getNFLGamesForWeek":
-            return self.schedules.get(params["week"], [])
+            week = params.get("week", params.get("gameWeek"))
+            return self.schedules.get(week, [])
         if endpoint == "getNFLScoresOnly":
             return self.scores.get(params["gameWeek"], {})
         raise AssertionError(f"Unexpected API endpoint: {endpoint}")

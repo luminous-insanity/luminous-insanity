@@ -1,0 +1,40 @@
+{% extends 'main/base.html' %}
+{% block title %}Aim Crossfire · {{ game.away_team }} @ {{ game.home_team }}{% endblock %}
+
+{% block content %}
+<section class="xf-hero xf-hero-compact">
+    <div class="xf-hero-copy">
+        <p class="xf-kicker"><a href="{% url 'crossfire' %}?week={{ game.week }}">← Crossfire</a></p>
+        <h1>Aim on this game</h1>
+        <p class="xf-lede">
+            <strong>{{ game.away_team }} @ {{ game.home_team }}</strong>
+            · You locked <strong>{{ my_pick.team_picked }}</strong>
+            · {{ tokens_left }} token{{ tokens_left|pluralize }} left
+        </p>
+    </div>
+</section>
+
+{% if tokens_left < 1 %}
+    <p class="xf-empty">You’re out of tokens this week. Hits and misses still resolve on the board.</p>
+{% elif not targets %}
+    <p class="xf-empty">
+        Nobody with the opposite pick is available. Friends and rivals need to lock the other side first.
+    </p>
+{% else %}
+    <ul class="xf-aim-list">
+        {% for t in targets %}
+        <li class="xf-aim-row">
+            <div>
+                <strong>{{ t.user.username }}</strong>
+                {% if t.is_friend %}<span class="pill">Friend</span>{% endif %}
+                <span class="xf-muted">picked {{ t.side }}</span>
+            </div>
+            <form method="post" action="{% url 'crossfire_fire' game.game_id t.user.id %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-red btn-sm">Fire Crossfire</button>
+            </form>
+        </li>
+        {% endfor %}
+    </ul>
+{% endif %}
+{% endblock %}

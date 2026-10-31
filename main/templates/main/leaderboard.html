@@ -16,9 +16,34 @@
            aria-selected="{% if tab == 'weekly' %}true{% else %}false{% endif %}">Weekly</a>
         <a href="{{ season_url }}" role="tab" class="{% if tab == 'season' %}is-active{% endif %}"
            aria-selected="{% if tab == 'season' %}true{% else %}false{% endif %}">Season</a>
+        <a href="{{ confidence_url }}" role="tab" class="{% if tab == 'confidence' %}is-active{% endif %}"
+           aria-selected="{% if tab == 'confidence' %}true{% else %}false{% endif %}">Confidence</a>
     </div>
 </div>
 
+
+{% if tab == 'confidence' %}
+<section class="card" style="margin-bottom:18px">
+    <p class="muted">Confidence Points from correct Lean/Solid/Lock picks. Underdog locks earn a bonus. This does not change W-L-T standings.</p>
+    {% if confidence_rows %}
+    <table class="lb-table">
+        <thead><tr><th>#</th><th>Player</th><th>Points</th><th>Dog locks</th></tr></thead>
+        <tbody>
+        {% for row in confidence_rows %}
+            <tr class="{% if user.is_authenticated and row.user.id == user.id %}is-me{% endif %}">
+                <td><span class="lb-rank {% if row.rank == 1 %}top1{% elif row.rank == 2 %}top2{% elif row.rank == 3 %}top3{% endif %}">{{ row.rank }}</span></td>
+                <td>{{ row.user.username }}</td>
+                <td><strong>{{ row.points }}</strong></td>
+                <td>{{ row.underdog_locks }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="empty-state">No confidence points yet. Make picks with Lean, Solid, or Lock to climb this board.</p>
+    {% endif %}
+</section>
+{% else %}
 <div class="lb-controls">
     <form method="get" class="inline-form">
         <input type="hidden" name="tab" value="{{ tab }}">
@@ -165,4 +190,5 @@
 {% endif %}
 
 <script src="{% static 'js/leaderboard.js' %}"></script>
+{% endif %}
 {% endblock %}

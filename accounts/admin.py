@@ -1,18 +1,17 @@
 from django.contrib import admin
-from .models import Pick, UserStatistics, AchievementUnlock  # Import the models
+from .models import GameReaction  # noqa registered below
+from .models import Pick, AchievementUnlock
 
-# Register the Pick model
+# UserStatistics is legacy: standings are always derived from picks + final
+# scores (accounts/standings.py). The table and rows are preserved; the model
+# is no longer registered in admin.
+
+
 @admin.register(Pick)
 class PickAdmin(admin.ModelAdmin):
-    list_display = ('user', 'game', 'team_picked')  # Columns to display in admin list view
-    list_filter = ('team_picked',)  # Add a filter by team picked
-    search_fields = ('user__username', 'game__game_id')  # Add search fields for user and game
-
-# Register the UserStatistics model
-@admin.register(UserStatistics)
-class UserStatisticsAdmin(admin.ModelAdmin):
-    list_display = ('user', 'wins', 'losses', 'ties')  # Display user statistics
-    search_fields = ('user__username',)  # Add search field for user
+    list_display = ('user', 'game', 'team_picked', 'confidence')
+    list_filter = ('team_picked', 'confidence')
+    search_fields = ('user__username', 'game__game_id')
 
 
 @admin.register(AchievementUnlock)
@@ -52,3 +51,19 @@ class BoardSquareAdmin(admin.ModelAdmin):
     list_filter = ('board',)
     search_fields = ('owner__username',)
 
+
+
+@admin.register(GameReaction)
+class GameReactionAdmin(admin.ModelAdmin):
+    list_display = ('user', 'game', 'emoji', 'created_at')
+    list_filter = ('emoji',)
+    search_fields = ('user__username',)
+
+from .models import Crossfire
+
+@admin.register(Crossfire)
+class CrossfireAdmin(admin.ModelAdmin):
+    list_display = ('season', 'week', 'attacker', 'target', 'game', 'attacker_side', 'target_side', 'created_at')
+    list_filter = ('season', 'week')
+    search_fields = ('attacker__username', 'target__username', 'game__game_id')
+    raw_id_fields = ('attacker', 'target', 'game')

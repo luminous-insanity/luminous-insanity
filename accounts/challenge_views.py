@@ -1,3 +1,4 @@
+from .live_features import rivalry_timeline
 """Pages for head-to-head challenges."""
 from django.conf import settings
 from django.contrib import messages
@@ -195,6 +196,7 @@ def challenge_detail(request, challenge_id):
     for g in games:
         g["kickoff_label"] = get_kickoff_label(g["game"])
 
+    rivalry = rivalry_timeline(c.challenger, c.opponent, season=c.season)
     return render(request, "accounts/challenge_detail.html", {
         **row,
         "me": me,
@@ -204,4 +206,5 @@ def challenge_detail(request, challenge_id):
         "winner": (c.challenger if result.winner_id == c.challenger_id
                    else c.opponent) if result.winner_id else None,
         "i_am_winner": result.winner_id == me.id,
+        "rivalry": rivalry,
     })

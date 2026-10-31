@@ -7,6 +7,7 @@ from django.contrib.auth import login, logout
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
+from django.http import JsonResponse
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 from django.utils import timezone
@@ -20,6 +21,13 @@ from .leaderboard import default_week
 from .playermenu import menu_data, stats_summary
 from .standings import compute_standings, standing_for
 from .achievements import achievement_summary
+from .narrative import build_narratives
+from .confidence import confidence_points_for_user
+from .titles import display_title, available_titles
+from .live_features import underdog_hunter_quest, live_game_moments, confidence_board
+from .quests import build_weekly_quests
+from .path_to_playoffs import path_to_playoffs
+from .recap import build_week_recap
 import logging
 
 
@@ -150,6 +158,16 @@ def dashboard(request):
         receiver=request.user,
         status=FriendRequest.PENDING,
     ).select_related('sender').order_by('-created_at')
+
+    alert_friend_requests = FriendRequest.objects.filter(
+        receiver=request.user,
+        status=FriendRequest.PENDING,
+        receiver_seen=False,
+    ).select_related('sender').order_by('-created_at')
+    unread_reactions = PerformanceReaction.objects.filter(
+        player=request.user,
+        is_read=False,
+    )
 
     accepted_requests = FriendRequest.objects.filter(
         status=FriendRequest.ACCEPTED,
@@ -315,20 +333,40 @@ def dashboard(request):
         'friend_query': friend_query,
         'friend_results': friend_results,
         'incoming_requests': incoming_requests,
-        'notification_count': incoming_requests.count() + PerformanceReaction.objects.filter(player=request.user).count(),
+        'alert_friend_requests': alert_friend_requests,
+        'notification_count': alert_friend_requests.count() + unread_reactions.count(),
         'friends': friends,
         'friend_rows': friend_rows,
         'reaction_choices': PerformanceReaction.choices,
         'reaction_week': default_week(selected_season),
-        'received_reactions': PerformanceReaction.objects.filter(
-            player=request.user
-        ).select_related('reactor').order_by('-created_at')[:15],
+        'received_reactions': unread_reactions.select_related('reactor').order_by('-created_at')[:15],
         'my_stats': my_stats,
         'pending_challenges': challenges.incoming_pending(request.user),
         'achievement_summary': achievement_summary(request.user),
+        'narratives': build_narratives(request.user, selected_season),
+        'player_title': display_title(request.user),
+        'confidence_stats': confidence_points_for_user(request.user, season=selected_season),
+        'underdog_quest': underdog_hunter_quest(request.user, selected_season, mission_week),
+        'live_moments': live_game_moments(selected_season, mission_week),
+        'confidence_board_preview': confidence_board(selected_season, users=([request.user] + friends) if friends else [request.user], limit=8),
+        'weekly_quests': build_weekly_quests(request.user, selected_season, mission_week),
+        'path_playoffs': path_to_playoffs(request.user, selected_season),
     }
 
     return render(request, 'accounts/dashboard.html', context)
+
+
+@login_required
+@require_POST
+def mark_alerts_read(request):
+    """Mark dashboard alerts as seen without changing pending requests."""
+    PerformanceReaction.objects.filter(player=request.user, is_read=False).update(is_read=True)
+    FriendRequest.objects.filter(
+        receiver=request.user,
+        status=FriendRequest.PENDING,
+        receiver_seen=False,
+    ).update(receiver_seen=True)
+    return JsonResponse({'ok': True})
 
 
 @login_required
@@ -355,14 +393,15 @@ def picks(request, week_number=None):
         .order_by('game_date', 'kickoff', 'id')
     )
 
-    picks_by_game = {
-        p.game_id: p.team_picked
+    user_picks = {
+        p.game_id: p
         for p in Pick.objects.filter(
             user=request.user,
             game__in=games,
             game__season=selected_season,
         )
     }
+    picks_by_game = {gid: p.team_picked for gid, p in user_picks.items()}
 
     # Aggregate every site's picks for each game. These percentages are based
     # only on users who have actually submitted a pick for that game.
@@ -400,7 +439,10 @@ def picks(request, week_number=None):
 
     game_data = []
     for game in games:
-        has_scores = game.is_final
+        # Show live scores as soon as the API has them; only grade/standings
+        # still require is_final. Previously this gated on is_final only, so
+        # mid-game scores never rendered even though sync_scores wrote them.
+        has_scores = game.home_score is not None and game.away_score is not None
         counts = community_pick_counts.get(game.pk, {'home': 0, 'away': 0})
         community_total = counts['home'] + counts['away']
         away_percent = round(counts['away'] * 100 / community_total) if community_total else 0
@@ -430,6 +472,24 @@ def picks(request, week_number=None):
                     'headline': 'Your friend group is split',
                     'detail': f'{friend_same} friend{"s" if friend_same != 1 else ""} agreed with you; {friend_opposite} picked the other team.',
                 }
+        # Underdog detection from team records (cosmetic + confidence bonus signal)
+        home_rec = team_records.get(game.home_team) or {}
+        away_rec = team_records.get(game.away_team) or {}
+
+        def _pct(rec):
+            w = int(rec.get('wins') or rec.get('W') or 0)
+            l = int(rec.get('losses') or rec.get('L') or 0)
+            t = int(rec.get('ties') or rec.get('T') or 0)
+            n = w + l + t
+            return (w + 0.5 * t) / n if n else None
+
+        home_pct, away_pct = _pct(home_rec), _pct(away_rec)
+        home_is_dog = away_is_dog = False
+        if home_pct is not None and away_pct is not None:
+            home_is_dog = home_pct < away_pct
+            away_is_dog = away_pct < home_pct
+
+        user_pick_obj = user_picks.get(game.game_id)
         game_data.append({
             'game': game,
             'kickoff_label': get_kickoff_label(game),
@@ -438,8 +498,12 @@ def picks(request, week_number=None):
             'pick_status': user_pick or 'Not Picked',
             'pick_team': _team_name(game, user_pick),
             'pick_available': not game.has_started,
-            'home_record': team_records.get(game.home_team),
-            'away_record': team_records.get(game.away_team),
+            'hours_to_lock': (                round((game.lock_at - timezone.now()).total_seconds() / 3600, 1)                if (not game.has_started and game.lock_at)                else None            ),
+            'pick_confidence': user_pick_obj.confidence if user_pick_obj else None,
+            'home_record': home_rec or None,
+            'away_record': away_rec or None,
+            'home_is_underdog': home_is_dog,
+            'away_is_underdog': away_is_dog,
             'community_pick_total': community_total,
             'community_away_percent': away_percent,
             'community_home_percent': home_percent,
@@ -516,6 +580,16 @@ def make_pick(request, game_id):
         messages.error(request, 'Please choose the home or away team.')
         return redirect(back)
 
+    # Optional confidence 1–3. Invalid values are ignored (treated as unset).
+    confidence = request.POST.get('confidence') or None
+    if confidence is not None:
+        try:
+            confidence = int(confidence)
+            if confidence not in (Pick.CONFIDENCE_LEAN, Pick.CONFIDENCE_SOLID, Pick.CONFIDENCE_LOCK):
+                confidence = None
+        except (TypeError, ValueError):
+            confidence = None
+
     # Enforced on the server. Hiding the button in the page isn't enough:
     # anyone can send the request by hand.
     if game.has_started:
@@ -524,12 +598,14 @@ def make_pick(request, game_id):
 
     # Picks can be changed any time before kickoff (the lock check above stops
     # changes once the game has started).
+    defaults = {'team_picked': team_picked, 'confidence': confidence}
     pick, created = Pick.objects.update_or_create(
-        user=request.user, game=game, defaults={'team_picked': team_picked}
+        user=request.user, game=game, defaults=defaults
     )
     team = _team_name(game, team_picked)
     verb = 'saved' if created else 'changed'
-    messages.success(request, f'Pick {verb} for {game}: {team}.')
+    conf_label = {1: ' (Lean)', 2: ' (Solid)', 3: ' (Lock)'}.get(confidence, '')
+    messages.success(request, f'Pick {verb} for {game}: {team}{conf_label}.')
     return redirect(back)
 
 
@@ -649,3 +725,64 @@ def respond_friend_request(request, request_id, action):
         messages.error(request, "Invalid friend request action.")
 
     return redirect(f"{reverse('dashboard')}?friends=requests")
+
+
+@login_required
+@require_POST
+def equip_title_view(request):
+    from .titles import equip_title, available_titles
+    title = (request.POST.get('title') or '').strip()
+    if equip_title(request.user, title):
+        if title:
+            messages.success(request, f'Title equipped: {title}')
+        else:
+            messages.success(request, 'Title cleared.')
+    else:
+        messages.error(request, 'That title is not unlocked yet.')
+    return redirect(request.POST.get('next') or 'profile')
+
+
+@login_required
+@require_POST
+def react_to_game(request, game_id):
+    """Post or update a live emoji reaction on a single game."""
+    from .models import GameReaction
+    game = get_object_or_404(Game, game_id=game_id)
+    emoji = request.POST.get('emoji', '').strip()
+    valid = dict(GameReaction.choices)
+    if emoji not in valid:
+        messages.error(request, 'Pick a valid reaction.')
+        return redirect(request.POST.get('next') or 'dashboard')
+
+    # Only allow reactions once the game has started (live energy, not pre-game spam).
+    if not game.has_started:
+        messages.error(request, 'Reactions open at kickoff.')
+        return redirect(request.POST.get('next') or 'picks')
+
+    GameReaction.objects.update_or_create(
+        user=request.user,
+        game=game,
+        defaults={'emoji': emoji},
+    )
+    messages.success(request, f'Reacted {emoji} to {game.away_team} @ {game.home_team}.')
+    next_url = request.POST.get('next') or reverse('picks') + f'?season={game.season}&week={game.week}'
+    return redirect(next_url)
+
+
+@login_required
+def week_recap(request):
+    """Post-week (or mid-week) recap of record, confidence, friends, highlights."""
+    selected_season, seasons = _selected_season(request)
+    try:
+        week = int(request.GET.get('week', ''))
+    except (TypeError, ValueError):
+        week = current_week() if selected_season == settings.NFL_SEASON else default_week(selected_season)
+    if week < 1 or week > 22:
+        week = current_week()
+    recap = build_week_recap(request.user, selected_season, week)
+    return render(request, 'accounts/week_recap.html', {
+        'recap': recap,
+        'selected_season': selected_season,
+        'seasons': seasons,
+        'weeks': range(1, 19),
+    })

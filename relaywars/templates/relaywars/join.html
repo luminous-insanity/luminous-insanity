@@ -1,0 +1,12 @@
+{% extends 'main/base.html' %}
+{% block title %}Join {{ team.name }} | Relay Wars{% endblock %}
+{% block content %}
+<section class="card" style="max-width:560px; margin:30px auto; padding:22px;">
+    <h1>Join {{ team.name }}</h1>
+    <p>{{ team.season }} · Week {{ team.week }} · {{ team.member_count }}/4 players</p>
+    <p>You'll be drafted onto this team and compete against another Relay Wars team.</p>
+    {% if team.status == 'recruiting' %}
+        <form method="post">{% csrf_token %}<button class="btn btn-red" type="submit">Join this team</button></form>
+    {% else %}<p>This team is no longer accepting players.</p>{% endif %}
+</section>
+{% endblock %}

@@ -20,10 +20,15 @@
 
 <div class="achv-grid">
     {% for achievement in cards %}
-        <article class="card achv {% if achievement.complete %}is-complete{% endif %}">
+        <article class="card achv {% if achievement.complete %}is-complete{% elif achievement.unlocked_count %}is-partial{% else %}is-locked{% endif %}">
             <div class="achv-top">
-                <span class="achv-icon" aria-hidden="true">{% if achievement.complete %}🏆{% elif achievement.unlocked_count %}🥇{% else %}🔒{% endif %}</span>
-                <div>
+                <div class="achv-trophy {% if achievement.complete %}is-gold{% elif achievement.unlocked_count %}is-silver{% endif %}" aria-hidden="true">
+                    <span class="achv-trophy-emoji">{{ achievement.icon|default:"🏆" }}</span>
+                    {% if achievement.complete %}
+                        <span class="achv-trophy-mark">🏆</span>
+                    {% endif %}
+                </div>
+                <div class="achv-copy">
                     <h2>{{ achievement.title }}</h2>
                     <p class="muted">{{ achievement.description }}</p>
                 </div>
@@ -32,7 +37,7 @@
             <ul class="milestones">
                 {% for milestone in achievement.milestones %}
                     <li class="{% if milestone.unlocked %}is-unlocked{% endif %}">
-                        <span aria-hidden="true">{% if milestone.unlocked %}🏅{% else %}🔒{% endif %}</span>
+                        <span class="milestone-icon" aria-hidden="true">{% if milestone.unlocked %}🏅{% else %}○{% endif %}</span>
                         <strong>{{ milestone.threshold }}</strong>
                         <span class="muted">
                             {% if milestone.unlocked %}Unlocked{% if milestone.unlocked_at %} &middot; {{ milestone.unlocked_at|date:"M j, Y" }}{% endif %}{% else %}{{ milestone.progress }} / {{ milestone.threshold }}{% endif %}

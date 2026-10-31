@@ -1,0 +1,43 @@
+{% extends 'main/base.html' %}
+{% block title %}Share moments | GameDayPicks{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Share moments</h1>
+        <p>Perfect weeks and rivalry cards you can send to friends.</p>
+    </div>
+</div>
+
+<section class="section-card">
+    <h2>Perfect weeks · {{ season }}</h2>
+    {% if perfect_weeks %}
+        <ul class="stack" style="list-style:none;padding:0">
+            {% for item in perfect_weeks %}
+                <li class="row">
+                    <span>Week {{ item.week }} · {{ item.record.wins }}-0-0</span>
+                    <a class="btn btn-sm" href="{% url 'share_perfect_week' user.id season item.week %}">Open card</a>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="muted">No perfect weeks yet this season. Nail every game in a week to unlock a share card.</p>
+    {% endif %}
+</section>
+
+<section class="section-card" style="margin-top:16px">
+    <h2>Rivalries</h2>
+    {% if challenges %}
+        <ul class="stack" style="list-style:none;padding:0">
+            {% for c in challenges %}
+                <li class="row">
+                    <span>{{ c.challenger.username }} vs {{ c.opponent.username }} · W{{ c.week }}</span>
+                    <a class="btn btn-sm btn-quiet" href="{% url 'share_challenge' c.id %}">Card</a>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="muted">Challenge a friend to create a rivalry moment.</p>
+    {% endif %}
+</section>
+{% endblock %}

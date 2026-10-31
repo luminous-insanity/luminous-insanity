@@ -12,7 +12,7 @@
   <p class="eyebrow">THE CHAMPIONSHIP FIELD</p>
   {% if bracket.is_provisional %}
     <h2>Qualification is still provisional</h2>
-    <p class="muted">This is a live bracket preview based on current division standings. The field can change until every regular-season game is final.</p>
+    <p class="muted">This is a live preview using the active-player field-size formula and Season Score qualification rules. The field can change until the regular season is complete.</p>
   {% else %}
     <h2>Regular-season qualification is final</h2>
     <p class="muted">The field below combines automatic division qualifiers, one winning-percentage wildcard per division, and league-wide head-to-head wildcards. Match winners are not decided until elimination rounds are played.</p>
@@ -24,7 +24,7 @@
   {% else %}
     <p><a href="{% url 'login' %}?next={% url 'playoffs' %}">Log in</a> to see your current championship position.</p>
   {% endif %}
-  {% if bracket.slots_open %}<p class="muted">{{ bracket.slots_open }} championship spot{{ bracket.slots_open|pluralize }} currently open based on the configured division qualifiers.</p>{% endif %}
+  {% if bracket.slots_open %}<p class="muted">{{ bracket.slots_open }} championship spot{{ bracket.slots_open|pluralize }} currently open because not enough players meet the qualification requirements.</p>{% endif %}
 </section>
 
 <section class="card" style="padding:18px;margin:14px 0;">
@@ -67,7 +67,7 @@
 
 <section class="card" style="padding:18px;margin:14px 0;">
   <p class="eyebrow">QUALIFIERS BY DIVISION</p>
-  <p class="muted">Qualification combines the configured automatic spots in each division, one winning-percentage wildcard per division, and {{ bracket.head_to_head_wildcard_spots }} league-wide head-to-head wildcard spot{{ bracket.head_to_head_wildcard_spots|pluralize }}. Only completed challenge victories count; players already qualified through another route cannot take a second spot.</p>
+  <p class="muted">The field size scales with the number of active players. Qualifiers are selected through proportional division seats, at-large Season Score seats, and eligible head-to-head seats. Unfilled seats roll down to the next eligible players; seats can remain empty if too few players meet the merit and participation requirements.</p>
   <a class="btn" href="{% url 'divisions' %}">View Division Wars</a>
 </section>
 <p class="division-footnote">This phase creates the field and bracket preview only. It does not yet record elimination results or declare a champion; those require a postseason scoring and tie-break rule.</p>

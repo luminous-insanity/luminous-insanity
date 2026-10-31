@@ -41,6 +41,12 @@ class Game(models.Model):
     schedule_synced_at = models.DateTimeField(null=True, blank=True)
     scores_checked_at = models.DateTimeField(null=True, blank=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['season', 'week'], name='api_game_szn_wk_idx'),
+            models.Index(fields=['season', 'week', 'status'], name='api_game_szn_wk_st_idx'),
+        ]
+
     def __str__(self):
         return f"{self.away_team} at {self.home_team} (Week {self.week})"
 

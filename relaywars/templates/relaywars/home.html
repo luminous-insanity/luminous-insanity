@@ -1,0 +1,74 @@
+{% extends 'main/base.html' %}
+
+{% block title %}Relay Wars | GameDayPicks{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Relay Wars</h1>
+        <p>Build a team, draft your games, and beat another team's longest winning chain.</p>
+    </div>
+</div>
+
+<section class="card" style="padding:20px; margin-bottom:20px;">
+    <h2>Find your team</h2>
+    {% if events %}
+    <form method="post" style="display:grid; gap:12px; max-width:560px;">
+        {% csrf_token %}
+        <label> NFL week
+            <select name="event" required onchange="const v=this.value.split(':');this.form.season.value=v[0];this.form.week.value=v[1];">
+                {% for event in events %}<option value="{{ event.season }}:{{ event.week }}">{{ event.season }} — Week {{ event.week }} ({{ event.total }} games)</option>{% endfor %}
+            </select>
+        </label>
+        <input type="hidden" name="season" value="{{ events.0.season }}">
+        <input type="hidden" name="week" value="{{ events.0.week }}">
+        <label>Team name <input type="text" name="name" maxlength="40" placeholder="Optional team name"></label>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button class="btn btn-red" type="submit" name="action" value="create_team">Create team & invite friends</button>
+            <button class="btn" type="submit" name="action" value="random_queue">Find random teammates</button>
+        </div>
+    </form>
+    {% else %}
+        <p>No upcoming NFL games are loaded yet.</p>
+    {% endif %}
+    {% for entry in queued %}
+        <p class="muted">You're waiting for random teammates for {{ entry.season }} Week {{ entry.week }}.
+            <form method="post" action="{% url 'relaywars:leave_queue' %}">{% csrf_token %}<button class="btn btn-sm" type="submit">Leave queue</button></form>
+        </p>
+    {% endfor %}
+</section>
+
+{% if teams %}
+<h2 class="group-title">Your teams</h2>
+<div class="stat-grid stat-grid-2">
+{% for team in teams %}
+    <section class="card" style="padding:18px;">
+        <h3>{{ team.name }}</h3>
+        <p class="muted">{{ team.season }} · Week {{ team.week }} · {{ team.member_count }}/4 players</p>
+        <ul>{% for member in team.active_members %}<li>{{ member.user.username }}</li>{% endfor %}</ul>
+        <form method="post" action="{% url 'relaywars:leave_team' team.pk %}" style="margin-top:10px;">{% csrf_token %}<button class="btn btn-sm" type="submit">Leave team</button></form>
+        {% if team.status == 'recruiting' %}
+            <p>Invite friends using this link:</p>
+            <input readonly value="{{ request.scheme }}://{{ request.get_host }}{% url 'relaywars:join_team' team.invite_code %}" onclick="this.select()">
+            <p class="muted">Once four players join, your team is paired with another team.</p>
+        {% elif team.status == 'ready' %}
+            <p>Team is full. Waiting for an opponent.</p>
+        {% else %}
+            {% if team.match_as_a %}<a class="btn btn-red" href="{% url 'relaywars:match' team.match_as_a.pk %}">Open matchup</a>
+            {% elif team.match_as_b %}<a class="btn btn-red" href="{% url 'relaywars:match' team.match_as_b.pk %}">Open matchup</a>{% endif %}
+        {% endif %}
+    </section>
+{% endfor %}
+</div>
+{% endif %}
+
+{% if matches %}
+<h2 class="group-title">Your matchups</h2>
+<div class="card" style="padding:16px;">
+{% for match in matches %}
+    <p><strong>{{ match.team_a.name }} vs {{ match.team_b.name }}</strong> — {{ match.season }} Week {{ match.week }}
+    <a class="btn btn-sm" href="{% url 'relaywars:match' match.pk %}">View Relay Wars</a></p>
+{% endfor %}
+</div>
+{% endif %}
+{% endblock %}

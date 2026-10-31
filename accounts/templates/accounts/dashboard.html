@@ -5,49 +5,152 @@
 
 {% block content %}
 <div class="dashboard-layout">
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var alerts = document.querySelector('.notify[data-has-notifications="1"]');
+    if (!alerts) return;
+    var csrfInput = alerts.querySelector('input[name="csrfmiddlewaretoken"]');
+    var badge = alerts.querySelector('.count-badge');
+    var sent = false;
+    alerts.addEventListener('toggle', function () {
+        if (!alerts.open || sent) return;
+        sent = true;
+        var body = new FormData();
+        if (csrfInput) body.append('csrfmiddlewaretoken', csrfInput.value);
+        fetch('{% url "mark_alerts_read" %}', {
+            method: 'POST', credentials: 'same-origin', body: body,
+            headers: {'X-Requested-With': 'XMLHttpRequest'}
+        }).then(function (response) {
+            if (!response.ok) throw new Error('Unable to mark alerts as read');
+            if (badge) badge.remove();
+            alerts.removeAttribute('data-has-notifications');
+        }).catch(function () { sent = false; });
+    });
+});
+</script>
 
-    <div class="page-head">
-        <div>
-            <h1>Dashboard</h1>
-            <p>{{ selected_season }} season</p>
+
+    <section class="cmd-hero" aria-labelledby="cmd-title">
+        <div class="cmd-hero-topline">
+            <span class="cmd-kicker">COMMAND CENTER</span>
+            <span class="pill">{{ selected_season }} SEASON</span>
+            <details class="notify" style="margin-left:auto" {% if notification_count %}data-has-notifications="1"{% endif %}>
+                <summary class="btn btn-quiet btn-sm">
+                    Alerts
+                    {% if notification_count %}<span class="count-badge">{{ notification_count }}</span>{% endif %}
+                </summary>
+                <div class="notify-panel">
+                    {% for reaction in received_reactions %}
+                        <p><strong>{{ reaction.reactor.username }}</strong> reacted {{ reaction.emoji }} to your week {{ reaction.week }} record.</p>
+                    {% endfor %}
+                    {% for friend_request in alert_friend_requests %}
+                        <p><strong>{{ friend_request.sender.username }}</strong> sent you a friend request.
+                            <a href="#friendsPanelRequests" data-open-friend-requests>View request</a>
+                        </p>
+                    {% endfor %}
+                    {% if not received_reactions and not alert_friend_requests %}<p class="muted">You're all caught up.</p>{% endif %}
+                </div>
+                <form id="markAlertsReadForm" hidden>{% csrf_token %}</form>
+            </details>
         </div>
-
-        <details class="notify" {% if incoming_requests or received_reactions %}data-has-notifications="1"{% endif %}>
-            <summary class="btn btn-quiet btn-sm">
-                Notifications
-                {% if incoming_requests or received_reactions %}<span class="count-badge">{{ notification_count }}</span>{% endif %}
-            </summary>
-            <div class="notify-panel">
-                {% for reaction in received_reactions %}
-                    <p><strong>{{ reaction.reactor.username }}</strong> reacted {{ reaction.emoji }} to your week {{ reaction.week }} record.</p>
-                {% endfor %}
-                {% for friend_request in incoming_requests %}
-                    <p><strong>{{ friend_request.sender.username }}</strong> sent you a friend request.
-                        <a href="#friendsPanelRequests" data-open-friend-requests>View request</a>
-                    </p>
-                {% endfor %}
-                {% if not received_reactions and not incoming_requests %}<p class="muted">You're all caught up.</p>{% endif %}
+        <h1 id="cmd-title">Hey, {{ user.username }}</h1>
+        <p class="hero-sub">Your game hub. Lock picks, chase friends, climb the board, earn trophies.</p>
+        <p style="margin:0 0 12px;position:relative"><a class="btn btn-sm btn-quiet" href="{% url 'week_recap' %}?season={{ selected_season }}&amp;week={{ mission_week }}">Week {{ mission_week }} recap</a></p>
+        <div class="cmd-stats-row">
+            <div class="cmd-stat">
+                <div class="label">Record</div>
+                <div class="value">{% if user_stats %}{{ user_stats.wins }}–{{ user_stats.losses }}–{{ user_stats.ties }}{% else %}—{% endif %}</div>
             </div>
-        </details>
-    </div>
-
-    <section class="weekly-mission {% if mission_complete %}is-complete{% endif %}" aria-labelledby="mission-title">
-        <div class="mission-topline">
-            <span class="mission-kicker">WEEK {{ mission_week }} · SIDE QUEST</span>
-            {% if mission_complete %}<span class="mission-status">MISSION COMPLETE ✓</span>{% else %}<span class="mission-status">{{ mission_picked_count }}/{{ mission_game_count }} locked in</span>{% endif %}
-        </div>
-        <div class="mission-content">
-            <div class="mission-copy">
-                <h2 id="mission-title">{% if mission_complete %}You're ready for kickoff.{% else %}Lock in your week.{% endif %}</h2>
-                <p>{% if mission_complete %}Every game picked. Now see how your calls stack up against your friends.{% elif mission_game_count %}Make your picks for every game to complete your weekly mission. Your picks lock at kickoff.{% else %}Your weekly mission will appear when the schedule is available.{% endif %}</p>
+            <div class="cmd-stat">
+                <div class="label">Week</div>
+                <div class="value">{{ mission_week }}</div>
             </div>
-            <a href="{% url 'picks' %}?season={{ selected_season }}&amp;week={{ mission_week }}" class="mission-cta">{% if mission_complete %}View your picks <span aria-hidden="true">→</span>{% else %}Continue picks <span aria-hidden="true">→</span>{% endif %}</a>
+            {% if achievement_summary and achievement_summary.total_unlocked %}
+            <div class="cmd-stat">
+                <div class="label">Trophies</div>
+                <div class="value">{{ achievement_summary.total_unlocked }}</div>
+            </div>
+            {% endif %}
+            {% if pending_challenges %}
+            <div class="cmd-stat">
+                <div class="label">Challenges</div>
+                <div class="value">{{ pending_challenges|length }}</div>
+            </div>
+            {% endif %}
         </div>
-        <div class="mission-progress" role="progressbar" aria-label="Weekly pick completion" aria-valuemin="0" aria-valuemax="{{ mission_game_count }}" aria-valuenow="{{ mission_picked_count }}">
-            <span style="width:{{ mission_percent }}%"></span>
-        </div>
-        <div class="mission-foot"><span>{{ mission_percent }}% complete</span><span>Reward: bragging rights 🏆</span></div>
     </section>
+
+    <section class="scoreboard" aria-labelledby="record-title">
+        <div class="scoreboard-head">
+            <h2 id="record-title">Your record</h2>
+            <form method="get" class="inline-form">
+                <label for="season" class="visually-hidden">Season</label>
+                <select name="season" id="season" onchange="this.form.submit()">
+                    {% for season in seasons %}
+                        <option value="{{ season }}" {% if selected_season == season %}selected{% endif %}>{{ season }} season</option>
+                    {% endfor %}
+                </select>
+                <label for="record_week" class="visually-hidden">Record to show</label>
+                <select name="record_week" id="record_week" onchange="this.form.submit()">
+                    <option value="season" {% if record_week == 'season' %}selected{% endif %}>Whole season</option>
+                    {% for week in weeks %}
+                        <option value="{{ week }}" {% if record_week == week|stringformat:"s" %}selected{% endif %}>Week {{ week }}</option>
+                    {% endfor %}
+                </select>
+                <noscript><button type="submit" class="btn btn-sm">Show</button></noscript>
+            </form>
+        </div>
+
+        <div class="score-row">
+            <div class="score-cell"><span class="score-num">{{ user_stats.wins }}</span><span class="score-label">Wins</span></div>
+            <div class="score-cell"><span class="score-num">{{ user_stats.losses }}</span><span class="score-label">Losses</span></div>
+            <div class="score-cell"><span class="score-num">{{ user_stats.ties }}</span><span class="score-label">Ties</span></div>
+        </div>
+
+        <div class="scoreboard-actions">
+            <a href="{% url 'picks' %}?season={{ selected_season }}" class="btn btn-red">Make picks</a>
+            <a href="{% url 'leaderboard' %}?season={{ selected_season }}" class="btn btn-quiet">Leaderboard</a>
+        </div>
+    </section>
+
+
+    <section class="section" aria-labelledby="stats-title">
+        <div class="section-head"><h2 id="stats-title">Your stats</h2></div>
+        <div class="stat-grid">
+            <div class="stat"><span class="stat-num">{{ my_stats.weeks_won }}</span><span class="stat-label">Weeks won</span></div>
+            <div class="stat"><span class="stat-num">{{ my_stats.seasons_won }}</span><span class="stat-label">Seasons won</span></div>
+            <div class="stat"><span class="stat-num">{{ my_stats.season_pct }}</span><span class="stat-label">{{ selected_season }} win rate</span></div>
+            <div class="stat"><span class="stat-num">{{ my_stats.career_pct }}</span><span class="stat-label">Career win rate</span></div>
+            <div class="stat"><span class="stat-num">{{ my_stats.challenges_won }}</span><span class="stat-label">Challenges won</span></div>
+            <div class="stat"><span class="stat-num">{{ my_stats.challenge_record }}</span><span class="stat-label">Head-to-head &middot; {{ my_stats.battles }} battle{{ my_stats.battles|pluralize }}</span></div>
+        </div>
+
+        <a href="{% url 'challenges' %}" class="challenge-link">
+            <span>
+                <strong>Head-to-head challenges</strong>
+                <small>
+                    {% if pending_challenges %}{{ pending_challenges }} waiting for your answer{% else %}Challenge a friend to a game or a week.{% endif %}
+                </small>
+            </span>
+            {% if pending_challenges %}<span class="count-badge">{{ pending_challenges }}</span>{% endif %}
+        </a>
+    </section>
+
+    <section class="path-playoffs section-card emphasis-{{ path_playoffs.status }}" aria-labelledby="path-title">
+        <div class="section-head">
+            <h2 id="path-title">Path to playoffs</h2>
+            <a href="{% url 'playoffs' %}">Bracket</a>
+        </div>
+        <p class="path-headline"><strong>{{ path_playoffs.headline }}</strong></p>
+        <p class="muted" style="margin:0 0 8px">{{ path_playoffs.detail }}</p>
+        <div class="row" style="gap:12px;flex-wrap:wrap">
+            {% if path_playoffs.division %}<span class="pill">{{ path_playoffs.division }}</span>{% endif %}
+            {% if path_playoffs.record %}<span class="pill">{{ path_playoffs.record }}</span>{% endif %}
+            {% if path_playoffs.division_rank %}<span class="pill">#{{ path_playoffs.division_rank }}</span>{% endif %}
+            {% if path_playoffs.qualified %}<span class="pill pill-gold">Qualified</span>{% endif %}
+        </div>
+    </section>
+
 
     <section class="weekly-race" aria-labelledby="weekly-race-title">
         <div class="weekly-race-head">
@@ -92,61 +195,175 @@
         {% endif %}
     </section>
 
-
-    <section class="scoreboard" aria-labelledby="record-title">
-        <div class="scoreboard-head">
-            <h2 id="record-title">Your record</h2>
-            <form method="get" class="inline-form">
-                <label for="season" class="visually-hidden">Season</label>
-                <select name="season" id="season" onchange="this.form.submit()">
-                    {% for season in seasons %}
-                        <option value="{{ season }}" {% if selected_season == season %}selected{% endif %}>{{ season }} season</option>
-                    {% endfor %}
-                </select>
-                <label for="record_week" class="visually-hidden">Record to show</label>
-                <select name="record_week" id="record_week" onchange="this.form.submit()">
-                    <option value="season" {% if record_week == 'season' %}selected{% endif %}>Whole season</option>
-                    {% for week in weeks %}
-                        <option value="{{ week }}" {% if record_week == week|stringformat:"s" %}selected{% endif %}>Week {{ week }}</option>
-                    {% endfor %}
-                </select>
-                <noscript><button type="submit" class="btn btn-sm">Show</button></noscript>
-            </form>
-        </div>
-
-        <div class="score-row">
-            <div class="score-cell"><span class="score-num">{{ user_stats.wins }}</span><span class="score-label">Wins</span></div>
-            <div class="score-cell"><span class="score-num">{{ user_stats.losses }}</span><span class="score-label">Losses</span></div>
-            <div class="score-cell"><span class="score-num">{{ user_stats.ties }}</span><span class="score-label">Ties</span></div>
-        </div>
-
-        <div class="scoreboard-actions">
-            <a href="{% url 'picks' %}?season={{ selected_season }}" class="btn btn-red">Make picks</a>
-            <a href="{% url 'leaderboard' %}?season={{ selected_season }}" class="btn btn-quiet">Leaderboard</a>
-        </div>
-    </section>
-
-    <section class="section" aria-labelledby="stats-title">
-        <div class="section-head"><h2 id="stats-title">Your stats</h2></div>
-        <div class="stat-grid">
-            <div class="stat"><span class="stat-num">{{ my_stats.weeks_won }}</span><span class="stat-label">Weeks won</span></div>
-            <div class="stat"><span class="stat-num">{{ my_stats.seasons_won }}</span><span class="stat-label">Seasons won</span></div>
-            <div class="stat"><span class="stat-num">{{ my_stats.season_pct }}</span><span class="stat-label">{{ selected_season }} win rate</span></div>
-            <div class="stat"><span class="stat-num">{{ my_stats.career_pct }}</span><span class="stat-label">Career win rate</span></div>
-            <div class="stat"><span class="stat-num">{{ my_stats.challenges_won }}</span><span class="stat-label">Challenges won</span></div>
-            <div class="stat"><span class="stat-num">{{ my_stats.challenge_record }}</span><span class="stat-label">Head-to-head &middot; {{ my_stats.battles }} battle{{ my_stats.battles|pluralize }}</span></div>
-        </div>
-
-        <a href="{% url 'challenges' %}" class="challenge-link">
-            <span>
-                <strong>Head-to-head challenges</strong>
-                <small>
-                    {% if pending_challenges %}{{ pending_challenges }} waiting for your answer{% else %}Challenge a friend to a game or a week.{% endif %}
-                </small>
+    <details class="dashboard-quest-drawer section-card">
+        <summary class="dashboard-disclosure-summary">
+            <span class="dashboard-disclosure-title">
+                <strong>Side quests &amp; missions</strong>
+                <small>Weekly mission · Dog Hunt · Quests</small>
             </span>
-            {% if pending_challenges %}<span class="count-badge">{{ pending_challenges }}</span>{% endif %}
-        </a>
+            <span class="dashboard-disclosure-indicator" aria-hidden="true">＋</span>
+        </summary>
+        <div class="dashboard-quest-content">
+            <section class="weekly-mission {% if mission_complete %}is-complete{% endif %}" aria-labelledby="mission-title">
+        <div class="mission-topline">
+            <span class="mission-kicker">WEEK {{ mission_week }} · SIDE QUEST</span>
+            {% if mission_complete %}<span class="mission-status">MISSION COMPLETE ✓</span>{% else %}<span class="mission-status">{{ mission_picked_count }}/{{ mission_game_count }} locked in</span>{% endif %}
+        </div>
+        <div class="mission-content">
+            <div class="mission-copy">
+                <h2 id="mission-title">{% if mission_complete %}You're ready for kickoff.{% else %}Lock in your week.{% endif %}</h2>
+                <p>{% if mission_complete %}Every game picked. Now see how your calls stack up against your friends.{% elif mission_game_count %}Make your picks for every game to complete your weekly mission. Your picks lock at kickoff.{% else %}Your weekly mission will appear when the schedule is available.{% endif %}</p>
+            </div>
+            <a href="{% url 'picks' %}?season={{ selected_season }}&amp;week={{ mission_week }}" class="mission-cta">{% if mission_complete %}View your picks <span aria-hidden="true">→</span>{% else %}Continue picks <span aria-hidden="true">→</span>{% endif %}</a>
+        </div>
+        <div class="mission-progress" role="progressbar" aria-label="Weekly pick completion" aria-valuemin="0" aria-valuemax="{{ mission_game_count }}" aria-valuenow="{{ mission_picked_count }}">
+            <span style="width:{{ mission_percent }}%"></span>
+        </div>
+        <div class="mission-foot"><span>{{ mission_percent }}% complete</span><span>Reward: bragging rights 🏆</span></div>
     </section>
+            {% if underdog_quest and underdog_quest.underdog_count %}
+            <section class="underdog-quest {% if underdog_quest.complete %}is-complete{% endif %}" aria-labelledby="dog-quest-title">
+        <div class="mission-topline">
+            <span class="mission-kicker">WEEK {{ underdog_quest.week }} · UNDERDOG HUNTER</span>
+            <span class="mission-status">{{ underdog_quest.taken }}/{{ underdog_quest.target }} dogs picked</span>
+        </div>
+        <div class="mission-content">
+            <div class="mission-copy">
+                <h2 id="dog-quest-title">{% if underdog_quest.complete %}Hunter on the prowl{% else %}Chase the underdogs{% endif %}</h2>
+                <p>{% if underdog_quest.complete %}You've backed {{ underdog_quest.taken }} underdog{{ underdog_quest.taken|pluralize }}. Lock confidence for bonus glory when they cover.{% else %}Pick at least {{ underdog_quest.target }} underdog{{ underdog_quest.target|pluralize }} this week. Lock a dog for extra Confidence Points if they win.{% endif %}</p>
+            </div>
+            <a href="{% url 'picks' %}?season={{ selected_season }}&amp;week={{ underdog_quest.week }}" class="btn btn-sm">{% if underdog_quest.complete %}View picks{% else %}Hunt dogs{% endif %}</a>
+        </div>
+        {% if underdog_quest.correct or underdog_quest.correct_locks %}
+        <p class="muted" style="margin:10px 0 0;font-size:0.85rem">
+            Graded: {{ underdog_quest.correct }} underdog win{{ underdog_quest.correct|pluralize }}
+            {% if underdog_quest.correct_locks %} · {{ underdog_quest.correct_locks }} lock{{ underdog_quest.correct_locks|pluralize }} hit{% endif %}
+        </p>
+        {% endif %}
+    </section>
+            {% endif %}
+            {% if weekly_quests and weekly_quests.quests %}
+            <section class="quest-board section-card" aria-labelledby="quest-board-title">
+        <div class="section-head">
+            <h2 id="quest-board-title">Week {{ weekly_quests.week }} quests</h2>
+            <span class="pill {% if weekly_quests.all_complete %}pill-gold{% endif %}">{{ weekly_quests.completed }}/{{ weekly_quests.total }}</span>
+        </div>
+        <ul class="quest-list">
+            {% for q in weekly_quests.quests %}
+            <li class="quest-item {% if q.complete %}is-complete{% endif %}">
+                <span class="quest-icon" aria-hidden="true">{{ q.icon }}</span>
+                <div class="quest-body">
+                    <strong>{{ q.title }}</strong>
+                    <p>{{ q.detail }}</p>
+                    <div class="quest-progress">
+                        <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="{{ q.target }}" aria-valuenow="{{ q.current }}">
+                            <span style="width:{% widthratio q.current q.target 100 %}%"></span>
+                        </div>
+                        <span class="quest-count">{{ q.current }}/{{ q.target }}</span>
+                    </div>
+                </div>
+                {% if not q.complete %}
+                    {% if q.cta == 'picks' %}
+                        <a class="btn btn-sm btn-quiet" href="{% url 'picks' %}?season={{ selected_season }}&amp;week={{ weekly_quests.week }}">{{ q.cta_label }}</a>
+                    {% elif q.cta == 'challenges' %}
+                        <a class="btn btn-sm btn-quiet" href="{% url 'challenges' %}">{{ q.cta_label }}</a>
+                    {% endif %}
+                {% else %}
+                    <span class="pill pill-win">Done</span>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% if weekly_quests.all_complete %}
+        <p class="muted" style="margin:12px 0 0;font-size:0.9rem">All weekly quests complete. Nice work, coach.</p>
+        {% endif %}
+    </section>
+            {% endif %}
+        </div>
+    </details>
+
+
+    {% if live_moments and live_moments.live_games or live_moments.reactions %}
+    <details class="live-energy section-card">
+        <summary class="dashboard-disclosure-summary">
+            <span class="dashboard-disclosure-title">
+                <strong>🔴 Live energy</strong>
+                <small>Live games and friend reactions</small>
+            </span>
+            <span class="dashboard-disclosure-indicator" aria-hidden="true">＋</span>
+        </summary>
+        <div class="dashboard-live-content">
+        <div class="section-head">
+            <a href="{% url 'picks' %}?season={{ selected_season }}&amp;week={{ mission_week }}">View games</a>
+        </div>
+        {% if live_moments.live_games %}
+        <ul class="live-game-list">
+            {% for g in live_moments.live_games %}
+            <li class="live-game-row">
+                <span class="pill pill-live">{{ g.status|upper }}</span>
+                <strong>{{ g.away_team }} {% if g.away_score is not None %}{{ g.away_score }}{% endif %} @ {{ g.home_team }} {% if g.home_score is not None %}{{ g.home_score }}{% endif %}</strong>
+                <form method="post" action="{% url 'react_to_game' g.game_id %}" class="live-react-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{% url 'dashboard' %}">
+                    <button type="submit" name="emoji" value="🔥" class="reaction-btn" title="Fire">🔥</button>
+                    <button type="submit" name="emoji" value="😱" class="reaction-btn" title="Shock">😱</button>
+                    <button type="submit" name="emoji" value="💪" class="reaction-btn" title="Clutch">💪</button>
+                    <button type="submit" name="emoji" value="🎉" class="reaction-btn" title="Party">🎉</button>
+                    <button type="submit" name="emoji" value="💔" class="reaction-btn" title="Heartbreak">💔</button>
+                </form>
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        {% if live_moments.reactions %}
+        <ul class="activity-list" style="margin-top:10px">
+            {% for r in live_moments.reactions %}
+            <li class="activity-item">
+                <span class="activity-icon">{{ r.emoji }}</span>
+                <div class="activity-body">
+                    <p><strong>{{ r.user.username }}</strong> on {{ r.game.away_team }} @ {{ r.game.home_team }}</p>
+                    <p class="detail">{{ r.created_at|timesince }} ago</p>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </div>
+    </details>
+    {% endif %}
+
+    {% if narratives %}
+    <section class="narrative-rail" aria-label="Season storylines">
+        {% for story in narratives %}
+            <article class="narrative-card emphasis-{{ story.emphasis }}">
+                <span class="narrative-icon" aria-hidden="true">{{ story.icon }}</span>
+                <div>
+                    <strong>{{ story.headline }}</strong>
+                    <p>{{ story.detail }}</p>
+                </div>
+            </article>
+        {% endfor %}
+    </section>
+    {% endif %}
+
+
+    {% if confidence_board_preview %}
+    <section class="section-card">
+        <div class="section-head">
+            <h2>⚡ Confidence board</h2>
+            <a href="{% url 'leaderboard' %}?tab=confidence&season={{ selected_season }}">Full board</a>
+        </div>
+        <ol class="race-list">
+            {% for row in confidence_board_preview %}
+            <li class="race-row {% if row.user.id == user.id %}is-me{% endif %}">
+                <span class="race-rank">{{ row.rank }}</span>
+                <span class="race-name">{{ row.user.username }}</span>
+                <span class="race-record">{{ row.points }} pts{% if row.underdog_locks %} · {{ row.underdog_locks }} 🐕{% endif %}</span>
+            </li>
+            {% endfor %}
+        </ol>
+    </section>
+    {% endif %}
 
     <section class="section" aria-labelledby="achievement-showcase-title">
         <div class="section-head">
@@ -157,7 +374,7 @@
             {% for achievement in achievement_summary.cards %}
                 {% if achievement.unlocked_count or forloop.counter <= 3 %}
                     <div class="trophy {% if achievement.complete %}is-complete{% endif %} {% if not achievement.unlocked_count %}is-locked{% endif %}">
-                        <span class="trophy-icon" aria-hidden="true">{% if achievement.complete %}🏆{% elif achievement.unlocked_count %}🥇{% else %}🔒{% endif %}</span>
+                        <span class="trophy-icon" aria-hidden="true">{% if achievement.icon %}{{ achievement.icon }}{% elif achievement.complete %}🏆{% elif achievement.unlocked_count %}🥇{% else %}🔒{% endif %}</span>
                         <strong>{{ achievement.title }}</strong>
                         <span class="muted">{{ achievement.unlocked_count }}/{{ achievement.total_levels }} levels</span>
                         {% if achievement.next_threshold %}
@@ -564,4 +781,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 })();
 </script>
+
+
+
 {% endblock %}

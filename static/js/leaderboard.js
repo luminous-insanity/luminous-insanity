@@ -34,27 +34,27 @@
 
         function placePopup(row) {
             panel.style.transform = '';
-            if (phone.matches) {            // CSS pins the bottom sheet
-                panel.style.position = '';
+            if (!row || phone.matches) {    // CSS pins the bottom sheet
+                menu.classList.remove('is-anchored');
                 panel.style.top = '';
                 panel.style.left = '';
+                panel.style.right = '';
+                panel.style.bottom = '';
                 return;
             }
-
-            /*
-             * The desktop menu is inside a grid-centred overlay. Positioning a
-             * relatively positioned panel with left/top offsets it from that
-             * centred spot, which makes it appear beside the clicked player.
-             * Fixed positioning makes these viewport coordinates exact.
-             */
+            // Fixed positioning so top/left are viewport coords (attached to the name).
+            menu.classList.add('is-anchored');
+            panel.style.right = '';
+            panel.style.bottom = '';
+            // Measure after anchored styles apply.
             var r = row.getBoundingClientRect();
-            var w = panel.offsetWidth, h = panel.offsetHeight;
-            var left = Math.min(Math.max(8, r.left + 24), window.innerWidth - w - 8);
+            var w = panel.offsetWidth || 400;
+            var h = panel.offsetHeight || 320;
+            var left = Math.min(Math.max(8, r.left), window.innerWidth - w - 8);
             var top = r.bottom + 6;
             if (top + h > window.innerHeight - 8) {
                 top = Math.max(8, r.top - h - 6);
             }
-            panel.style.position = 'fixed';
             panel.style.left = left + 'px';
             panel.style.top = top + 'px';
         }
@@ -107,7 +107,12 @@
         function closeMenu() {
             if (menu.hidden) { return; }
             menu.hidden = true;
+            menu.classList.remove('is-anchored');
             panel.style.transform = '';
+            panel.style.top = '';
+            panel.style.left = '';
+            panel.style.right = '';
+            panel.style.bottom = '';
             document.body.classList.remove('player-menu-open');
             if (openedFrom) { openedFrom.focus(); openedFrom = null; }
         }

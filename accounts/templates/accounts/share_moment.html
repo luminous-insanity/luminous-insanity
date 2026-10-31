@@ -1,0 +1,56 @@
+{% extends 'main/base.html' %}
+{% block title %}{{ headline }} | GameDayPicks{% endblock %}
+
+{% block content %}
+<div class="share-card" data-kind="{{ moment_kind }}">
+    <div class="share-card-inner">
+        <p class="share-kicker">GAMEDAYPICKS MOMENT</p>
+        <h1>{{ headline }}</h1>
+        <p class="share-sub">{{ subline }}</p>
+
+        {% if moment_kind == 'perfect_week' %}
+            <div class="share-stat-row">
+                <div class="share-stat">
+                    <span class="num">{{ record.wins }}</span>
+                    <span class="lbl">Correct</span>
+                </div>
+                <div class="share-stat">
+                    <span class="num">0</span>
+                    <span class="lbl">Misses</span>
+                </div>
+                <div class="share-stat">
+                    <span class="num">{{ record.total_games }}</span>
+                    <span class="lbl">Games</span>
+                </div>
+            </div>
+            {% if record.perfect %}
+                <p class="share-badge">✦ PERFECT WEEK ✦</p>
+            {% endif %}
+            <p class="share-player">{{ player.username }}{% if player_title %} · {{ player_title }}{% endif %}</p>
+        {% elif moment_kind == 'challenge' %}
+            <div class="share-vs">
+                <span>{{ challenge.challenger.username }}</span>
+                <span class="vs">VS</span>
+                <span>{{ challenge.opponent.username }}</span>
+            </div>
+            <p class="share-player">{{ challenge.get_status_display }} · Week {{ challenge.week }}</p>
+        {% endif %}
+
+        <div class="share-actions">
+            <button type="button" class="btn" id="copyShareLink">Copy link</button>
+            <a href="{% url 'home' %}" class="btn btn-quiet">GameDayPicks</a>
+        </div>
+        <p class="share-url muted" id="shareUrlText">{{ share_url }}</p>
+    </div>
+</div>
+<script>
+document.getElementById('copyShareLink')?.addEventListener('click', function () {
+    const url = document.getElementById('shareUrlText')?.textContent || window.location.href;
+    navigator.clipboard.writeText(url).then(function () {
+        document.getElementById('copyShareLink').textContent = 'Copied!';
+    }).catch(function () {
+        prompt('Copy this link:', url);
+    });
+});
+</script>
+{% endblock %}

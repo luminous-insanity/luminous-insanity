@@ -1,3 +1,4 @@
+from accounts.titles import available_titles, display_title
 # main/views.py
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
@@ -83,13 +84,37 @@ def leaderboard(request):
     selected_season, seasons = _selected_season(request)
 
     tab = request.GET.get('tab')
-    if tab not in ('weekly', 'season'):
+    if tab not in ('weekly', 'season', 'confidence'):
         # Old links used ?week=season for the season view and ?week=N for a week.
         tab = 'season' if request.GET.get('week') == 'season' else 'weekly'
 
-    mode = _remembered_filter(request, tab)
+    mode = _remembered_filter(request, tab if tab != 'confidence' else 'season')
     selected_week, weeks = _week_from_request(request, selected_season)
     weekly = tab == 'weekly'
+
+    if tab == 'confidence':
+        from accounts.live_features import confidence_board as conf_board_fn
+        conf_rows = conf_board_fn(season=selected_season, limit=50)
+        return render(request, 'main/leaderboard.html', {
+            'tab': 'confidence',
+            'filter_mode': mode,
+            'confidence_rows': conf_rows,
+            'user_stats': [],
+            'selected_week': selected_week,
+            'weeks': weeks,
+            'selected_season': selected_season,
+            'seasons': seasons,
+            'winners': [],
+            'winner_label': '',
+            'friends_empty': False,
+            'needs_login': False,
+            'champion': None,
+            'auto_reveal': False,
+            'weekly_url': f"{reverse('leaderboard')}?tab=weekly&season={selected_season}&week={selected_week}",
+            'season_url': f"{reverse('leaderboard')}?tab=season&season={selected_season}",
+            'confidence_url': f"{reverse('leaderboard')}?tab=confidence&season={selected_season}",
+            'reaction_choices': PerformanceReaction.choices,
+        })
 
     board = lb.build_board(
         tab=tab, season=selected_season,
@@ -160,6 +185,7 @@ def leaderboard(request):
             'season_final': champion is not None,
             'weekly_url': url(tab='weekly', week=selected_week),
             'season_url': url(tab='season'),
+            'confidence_url': url(tab='confidence'),
             'prev_url': url(week=prev_week) if prev_week else '',
             'next_url': url(week=next_week) if next_week else '',
             'all_url': url(filter=lb.FILTER_ALL),
@@ -369,6 +395,8 @@ def profile(request):
         'player_identity': identity,
         'team_choices': TEAM_CHOICES,
         'favorite_team_details': TEAM_DATA.get(identity.favorite_team),
+        'player_title': display_title(request.user),
+        'available_titles': available_titles(request.user),
     })
 
 
