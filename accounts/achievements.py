@@ -270,7 +270,7 @@ def _week_winners(season, week, user_ids=None):
     top = rows[0]
     if top.completed < 1:
         return []
-    return [r.user_id for r in rows if r.rank == 1 and r.completed > 0]
+    return [r.user.id for r in rows if r.rank == 1 and r.completed > 0]
 
 
 def _count_division_weeks_won(user):
