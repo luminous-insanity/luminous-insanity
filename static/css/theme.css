@@ -582,6 +582,22 @@ button.pick-btn:hover { border-color: color-mix(in srgb, var(--team-color) 55%, 
 .scoreboard .btn-quiet { color: #fff; border-color: rgba(255,255,255,.45); }
 .scoreboard .btn-quiet:hover { background: rgba(255,255,255,.12); }
 
+/* Your record controls: short labels + single compact row on phones */
+.record-recap-btn .lbl-short { display: none; }
+@media (max-width: 640px) {
+    .scoreboard-head { gap: 8px; }
+    .scoreboard-head h2 { flex: 0 0 100%; font-size: 1.2rem; }
+    .record-controls { flex: 1 1 100%; flex-wrap: nowrap; gap: 6px; min-width: 0; }
+    .record-recap-btn { flex: 0 0 auto; padding: 0 10px; font-size: .85rem; white-space: nowrap; }
+    .record-recap-btn .lbl-full { display: none; }
+    .record-recap-btn .lbl-short { display: inline; }
+    .record-controls .record-select { flex: 1 1 0; min-width: 0; width: 100%; min-height: 36px; padding: 0 24px 0 9px; font-size: .88rem; text-overflow: ellipsis; }
+}
+@media (max-width: 360px) {
+    .record-recap-btn { padding: 0 8px; font-size: .8rem; }
+    .record-controls .record-select { padding: 0 20px 0 7px; font-size: .82rem; }
+}
+
 .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 @media (max-width: 640px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } .score-row { gap: 8px; } }
 .stat { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 14px; }

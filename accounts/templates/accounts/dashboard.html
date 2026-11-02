@@ -59,24 +59,38 @@ document.addEventListener('DOMContentLoaded', function () {
         <section class="scoreboard" aria-labelledby="record-title">
             <div class="scoreboard-head">
                 <h2 id="record-title">Your record</h2>
-                <form method="get" class="inline-form">
+                <form method="get" class="inline-form record-controls">
                     <noscript><button type="submit" class="btn btn-sm">Show</button></noscript>
-                    <a class="btn btn-sm btn-quiet" href="{% url 'week_recap' %}?season={{ selected_season }}&amp;week={{ mission_week }}">Week {{ mission_week }} recap</a>
+                    <a class="btn btn-sm btn-quiet record-recap-btn" href="{% url 'week_recap' %}?season={{ selected_season }}&amp;week={{ mission_week }}" aria-label="Week {{ mission_week }} recap"><span class="lbl-full">Week {{ mission_week }} recap</span><span class="lbl-short" aria-hidden="true">Wk {{ mission_week }} recap</span></a>
                     <label for="season" class="visually-hidden">Season</label>
-                    <select name="season" id="season" onchange="this.form.submit()">
+                    <select name="season" id="season" class="record-select" onchange="this.form.submit()">
                         {% for season in seasons %}
-                            <option value="{{ season }}" {% if selected_season == season %}selected{% endif %}>{{ season }} season</option>
+                            <option value="{{ season }}" data-full="{{ season }} season" data-short="{{ season }}" {% if selected_season == season %}selected{% endif %}>{{ season }} season</option>
                         {% endfor %}
                     </select>
                     <label for="record_week" class="visually-hidden">Record to show</label>
-                    <select name="record_week" id="record_week" onchange="this.form.submit()">
-                        <option value="season" {% if record_week == 'season' %}selected{% endif %}>Whole season</option>
+                    <select name="record_week" id="record_week" class="record-select" onchange="this.form.submit()">
+                        <option value="season" data-full="Whole season" data-short="Season" {% if record_week == 'season' %}selected{% endif %}>Whole season</option>
                         {% for week in weeks %}
-                            <option value="{{ week }}" {% if record_week == week|stringformat:"s" %}selected{% endif %}>Week {{ week }}</option>
+                            <option value="{{ week }}" data-full="Week {{ week }}" data-short="Wk {{ week }}" {% if record_week == week|stringformat:"s" %}selected{% endif %}>Week {{ week }}</option>
                         {% endfor %}
                     </select>
 
                 </form>
+                <script>
+                (function () {
+                    // Swap long option labels for short ones on phones. Values are untouched.
+                    var mq = window.matchMedia('(max-width: 640px)');
+                    function apply() {
+                        document.querySelectorAll('.record-select option[data-short]').forEach(function (o) {
+                            o.textContent = mq.matches ? o.dataset.short : o.dataset.full;
+                        });
+                    }
+                    apply();
+                    if (mq.addEventListener) mq.addEventListener('change', apply);
+                    else if (mq.addListener) mq.addListener(apply);
+                })();
+                </script>
             </div>
 
             <div class="score-row">
