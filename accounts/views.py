@@ -28,6 +28,8 @@ from .live_features import underdog_hunter_quest, live_game_moments, confidence_
 from .quests import build_weekly_quests
 from .path_to_playoffs import path_to_playoffs
 from .recap import build_week_recap
+from .share_views import _week_record
+from relaywars.services import open_join_events
 import logging
 
 
@@ -308,6 +310,17 @@ def dashboard(request):
     activity_feed.sort(key=lambda item: item['at'], reverse=True)
     activity_feed = activity_feed[:10]
 
+    # Shared Moments are surfaced directly inside the dashboard Social Drawer.
+    # Reuse the same share-card records and URLs as the existing Share Moments hub.
+    shared_moment_weeks = []
+    for share_week in range(1, 19):
+        share_record = _week_record(request.user, selected_season, share_week)
+        if share_record['perfect']:
+            shared_moment_weeks.append({'week': share_week, 'record': share_record})
+    shared_moment_challenges = Challenge.objects.filter(
+        Q(challenger=request.user) | Q(opponent=request.user)
+    ).select_related('challenger', 'opponent').order_by('-created_at')[:10]
+
     context = {
         'mission_week': mission_week,
         'mission_game_count': mission_game_count,
@@ -351,6 +364,9 @@ def dashboard(request):
         'confidence_board_preview': confidence_board(selected_season, users=([request.user] + friends) if friends else [request.user], limit=8),
         'weekly_quests': build_weekly_quests(request.user, selected_season, mission_week),
         'path_playoffs': path_to_playoffs(request.user, selected_season),
+        'relay_join_events': open_join_events(),
+        'shared_moment_weeks': shared_moment_weeks,
+        'shared_moment_challenges': shared_moment_challenges,
     }
 
     return render(request, 'accounts/dashboard.html', context)
@@ -489,7 +505,7 @@ def picks(request, week_number=None):
             home_is_dog = home_pct < away_pct
             away_is_dog = away_pct < home_pct
 
-        user_pick_obj = user_picks.get(game.game_id)
+        user_pick_obj = user_picks.get(game.pk)
         game_data.append({
             'game': game,
             'kickoff_label': get_kickoff_label(game),

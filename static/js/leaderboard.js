@@ -46,14 +46,23 @@
             menu.classList.add('is-anchored');
             panel.style.right = '';
             panel.style.bottom = '';
-            // Measure after anchored styles apply.
+            // Apply anchored styles first, then measure from the trigger.
             var r = row.getBoundingClientRect();
+            var margin = 8;
             var w = panel.offsetWidth || 400;
             var h = panel.offsetHeight || 320;
-            var left = Math.min(Math.max(8, r.left), window.innerWidth - w - 8);
+            // Prefer aligning under the trigger's left edge; if that would
+            // spill off the right (common for the friends drawer), shift left
+            // so the full panel stays on screen. Fall back to right-aligning
+            // with the trigger when the trigger itself is near the right edge.
+            var left = r.left;
+            if (left + w > window.innerWidth - margin) {
+                left = r.right - w;
+            }
+            left = Math.min(Math.max(margin, left), window.innerWidth - w - margin);
             var top = r.bottom + 6;
-            if (top + h > window.innerHeight - 8) {
-                top = Math.max(8, r.top - h - 6);
+            if (top + h > window.innerHeight - margin) {
+                top = Math.max(margin, r.top - h - 6);
             }
             panel.style.left = left + 'px';
             panel.style.top = top + 'px';
@@ -101,6 +110,10 @@
             menu.hidden = false;
             document.body.classList.add('player-menu-open');
             placePopup(row);
+            // Second pass after layout so reaction block height is accurate.
+            requestAnimationFrame(function () {
+                if (!menu.hidden) { placePopup(row); }
+            });
             el('pm-profile').focus();
         }
 

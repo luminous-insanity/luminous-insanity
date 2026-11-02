@@ -9,7 +9,7 @@ from django.db.models import Q
 from api.models import Game
 from api.rules import grade_pick
 from api.services import current_week, get_team_records
-from .models import Pick, Challenge, FriendRequest
+from .models import Pick, Challenge, FriendRequest, Crossfire
 from .live_features import underdog_hunter_quest
 
 
@@ -45,6 +45,11 @@ def build_weekly_quests(user, season=None, week=None):
 
     # Underdog quest (reuse live_features)
     dog = underdog_hunter_quest(user, season, week)
+
+    # Crossfire mission: use all three weekly shots against opposing picks.
+    crossfire_fired = Crossfire.objects.filter(
+        attacker=user, season=season, week=week
+    ).count()
 
     # Challenge a friend this week
     has_challenge = Challenge.objects.filter(
@@ -108,6 +113,17 @@ def build_weekly_quests(user, season=None, week=None):
             'complete': solid_or_lock >= 3,
             'cta': 'picks',
             'cta_label': 'Set confidence',
+        },
+        {
+            'key': 'crossfire_three_shots',
+            'icon': '🎯',
+            'title': 'Three-shot Crossfire',
+            'detail': 'Fire all 3 Crossfire shots this week.',
+            'current': min(crossfire_fired, 3),
+            'target': 3,
+            'complete': crossfire_fired >= 3,
+            'cta': 'crossfire',
+            'cta_label': 'Open Crossfire',
         },
         {
             'key': 'throw_the_flag',

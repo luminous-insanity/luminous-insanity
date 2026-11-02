@@ -1,7 +1,7 @@
 import random
 
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Min, Q
 from django.utils import timezone
 
 from api.models import Game
@@ -19,6 +19,18 @@ class RelayWarsError(ValueError):
 
 def _upcoming_games(season, week):
     return Game.objects.filter(season=season, week=week, kickoff__isnull=False).order_by('kickoff', 'pk')
+
+
+def open_join_events():
+    """NFL weeks still open for Relay Wars joining (before that week's first kickoff)."""
+    return list(
+        Game.objects.filter(kickoff__isnull=False)
+        .values('season', 'week')
+        .annotate(total=Count('id'), first_kickoff=Min('kickoff'))
+        .filter(first_kickoff__gt=timezone.now())
+        .order_by('season', 'week')
+        .values('season', 'week', 'total', 'first_kickoff')
+    )
 
 
 

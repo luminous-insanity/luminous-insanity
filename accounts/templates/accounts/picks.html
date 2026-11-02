@@ -96,10 +96,15 @@
                     <input type="hidden" name="team_picked" value="{{ game_info.pick_status|default:'' }}">
                     <input type="hidden" name="confidence" value="{{ game_info.pick_confidence|default:'' }}" class="confidence-input">
                     <div class="confidence-row" role="group" aria-label="Confidence level">
-                        <span class="confidence-label">Confidence</span>
-                        <button type="button" class="confidence-chip {% if game_info.pick_confidence == 1 %}is-active{% endif %}" data-confidence="1" title="Lean">Lean</button>
-                        <button type="button" class="confidence-chip {% if game_info.pick_confidence == 2 %}is-active{% endif %}" data-confidence="2" title="Solid">Solid</button>
-                        <button type="button" class="confidence-chip {% if game_info.pick_confidence == 3 %}is-active{% endif %}" data-confidence="3" title="Lock">Lock</button>
+                        <div class="confidence-group">
+                            <span class="confidence-label">Confidence</span>
+                            <button type="button" class="confidence-chip {% if game_info.pick_confidence == 1 %}is-active{% endif %}" data-confidence="1" title="Lean">Lean</button>
+                            <button type="button" class="confidence-chip {% if game_info.pick_confidence == 2 %}is-active{% endif %}" data-confidence="2" title="Solid">Solid</button>
+                            <button type="button" class="confidence-chip {% if game_info.pick_confidence == 3 %}is-active{% endif %}" data-confidence="3" title="Lock">Lock</button>
+                        </div>
+                        {% if game_info.pick_team %}
+                            <a class="xf-pick-aim" href="{% url 'crossfire_aim' game_info.game.game_id %}">Crossfire</a>
+                        {% endif %}
                     </div>
                 </form>
             {% else %}
@@ -117,18 +122,15 @@
                 </div>
             {% endif %}
 
+            {% if not game_info.pick_team %}
             <div class="match-foot">
-                {% if game_info.pick_team %}
-                    <span>Your pick: <strong>{{ game_info.pick_team }}</strong></span>
-                    {% if game_info.pick_available %}
-                        <a class="xf-pick-aim" href="{% url 'crossfire_aim' game_info.game.game_id %}">Crossfire →</a>
-                    {% endif %}
-                {% elif game_info.pick_available %}
+                {% if game_info.pick_available %}
                     <span class="muted">Not picked yet</span>
                 {% else %}
                     <span class="muted">No pick made. This game has started.</span>
                 {% endif %}
             </div>
+            {% endif %}
 
             {% if game_info.show_community_picks %}
                 <section class="community-picks"
@@ -330,6 +332,14 @@ document.addEventListener("DOMContentLoaded", function () {
                 input.value = value;
                 form.querySelectorAll(".confidence-chip").forEach(function (c) { c.classList.remove("is-active"); });
                 this.classList.add("is-active");
+            }
+
+            // If a team is already chosen, save the confidence right away.
+            // (Before a team is chosen it just waits; picking a team submits it.)
+            const teamInput = form.querySelector('input[name="team_picked"]');
+            if (teamInput && teamInput.value) {
+                sessionStorage.setItem("scrollPosition", window.scrollY);
+                form.requestSubmit();
             }
         });
     });

@@ -135,3 +135,46 @@ class CrossfireViewTests(TestCase):
         board = self.client.get(reverse("crossfire") + "?week=5")
         self.assertContains(board, "prey2")
         self.assertContains(board, "Crossfire")
+
+
+@override_settings(**SETTINGS)
+class CrossfireMissionTests(TestCase):
+    def setUp(self):
+        self.a = User.objects.create_user("mission_hunter", password="pass")
+        self.b = User.objects.create_user("mission_target", password="pass")
+        self.games = [
+            Game.objects.create(
+                season=2026, week=6, game_id=f"CF-MISSION-{i}",
+                home_team="KC", away_team="BUF",
+                game_date=timezone.localdate(), kickoff=later(24 + i),
+                status=Game.SCHEDULED,
+            )
+            for i in range(3)
+        ]
+
+    def test_three_shot_crossfire_mission_tracks_weekly_fires(self):
+        from accounts.quests import build_weekly_quests
+
+        def mission():
+            quests = build_weekly_quests(self.a, season=2026, week=6)["quests"]
+            return next(q for q in quests if q["key"] == "crossfire_three_shots")
+
+        self.assertEqual(mission()["current"], 0)
+        self.assertFalse(mission()["complete"])
+
+        for game in self.games[:2]:
+            Crossfire.objects.create(
+                season=2026, week=6, attacker=self.a, target=self.b,
+                game=game, attacker_side=Pick.HOME, target_side=Pick.AWAY,
+            )
+
+        self.assertEqual(mission()["current"], 2)
+        self.assertFalse(mission()["complete"])
+
+        game = self.games[2]
+        Crossfire.objects.create(
+            season=2026, week=6, attacker=self.a, target=self.b,
+            game=game, attacker_side=Pick.HOME, target_side=Pick.AWAY,
+        )
+        self.assertEqual(mission()["current"], 3)
+        self.assertTrue(mission()["complete"])

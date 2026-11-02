@@ -64,7 +64,7 @@ def underdog_hunter_quest(user, season=None, week=None, team_records=None):
     correct = 0
     correct_locks = 0
     for game, side, name in underdog_games:
-        pick = picks.get(game.game_id)
+        pick = picks.get(game.pk)
         if not pick or pick.team_picked != side:
             continue
         taken += 1
@@ -89,7 +89,7 @@ def underdog_hunter_quest(user, season=None, week=None, team_records=None):
         'correct_locks': correct_locks,
         'complete': target > 0 and taken >= target,
         'underdog_games': [
-            {'game': g, 'side': s, 'team': t, 'picked': picks.get(g.game_id) and picks[g.game_id].team_picked == s}
+            {'game': g, 'side': s, 'team': t, 'picked': picks.get(g.pk) and picks[g.pk].team_picked == s}
             for g, s, t in underdog_games[:8]
         ],
     }

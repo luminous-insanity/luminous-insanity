@@ -272,6 +272,12 @@ class DashboardAndPagesTests(TestCase):
         self.game = make_game(week=1)
         self.client.force_login(self.a)
 
+    def test_dashboard_social_drawer_contains_shared_moments_section(self):
+        response = self.client.get(reverse("dashboard"))
+        self.assertContains(response, 'id="socialSectionMoments"')
+        self.assertContains(response, 'id="socialNavMoments"')
+        self.assertContains(response, "Shared Moments")
+
     def test_dashboard_shows_the_expanded_stats(self):
         response = self.client.get(reverse("dashboard"))
         for label in ("Weeks won", "Seasons won", "Career win rate", "Challenges won", "Head-to-head"):

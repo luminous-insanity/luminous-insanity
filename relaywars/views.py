@@ -9,13 +9,13 @@ from api.models import Game
 from .models import RelayAbility, RelayMatch, RelayPick, RelayQueueEntry, RelayTeam, RelayTeamMember
 from .services import (
     RelayWarsError, cast_ability_vote, close_draft_if_locked, create_invite_team, draft_state, leave_team,
-    join_invite_team, join_random_queue, propose_ability, refresh_match_scores,
+    join_invite_team, join_random_queue, open_join_events, propose_ability, refresh_match_scores,
     skip_turn, submit_pick,
 )
 
 
 def _event_choices():
-    return list(Game.objects.filter(kickoff__isnull=False).order_by('season', 'week').values('season', 'week').annotate(total=Count('id'), first_kickoff=Min('kickoff')).filter(first_kickoff__gt=timezone.now()).values('season', 'week', 'total').distinct())
+    return open_join_events()
 
 
 @login_required

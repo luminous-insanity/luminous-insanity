@@ -34,6 +34,7 @@ document.addEventListener('DOMContentLoaded', function () {
         <div class="cmd-hero-topline">
             <span class="cmd-kicker">COMMAND CENTER</span>
             <span class="pill">{{ selected_season }} SEASON</span>
+            <span class="pill">WEEK {{ mission_week }}</span>
             <details class="notify" style="margin-left:auto" {% if notification_count %}data-has-notifications="1"{% endif %}>
                 <summary class="btn btn-quiet btn-sm">
                     Alerts
@@ -53,66 +54,51 @@ document.addEventListener('DOMContentLoaded', function () {
                 <form id="markAlertsReadForm" hidden>{% csrf_token %}</form>
             </details>
         </div>
-        <h1 id="cmd-title">Hey, {{ user.username }}</h1>
+        <h1 id="cmd-title">Hey, {{ user.username }}{% if achievement_summary and achievement_summary.total_unlocked %} <a href="{% url 'achievements' %}" class="cmd-trophy" title="{{ achievement_summary.total_unlocked }} trophies earned" aria-label="{{ achievement_summary.total_unlocked }} trophies earned"><span aria-hidden="true">🏆</span> {{ achievement_summary.total_unlocked }}</a>{% endif %}</h1>
         <p class="hero-sub">Your game hub. Lock picks, chase friends, climb the board, earn trophies.</p>
-        <p style="margin:0 0 12px;position:relative"><a class="btn btn-sm btn-quiet" href="{% url 'week_recap' %}?season={{ selected_season }}&amp;week={{ mission_week }}">Week {{ mission_week }} recap</a></p>
+        <section class="scoreboard" aria-labelledby="record-title">
+            <div class="scoreboard-head">
+                <h2 id="record-title">Your record</h2>
+                <form method="get" class="inline-form">
+                    <noscript><button type="submit" class="btn btn-sm">Show</button></noscript>
+                    <a class="btn btn-sm btn-quiet" href="{% url 'week_recap' %}?season={{ selected_season }}&amp;week={{ mission_week }}">Week {{ mission_week }} recap</a>
+                    <label for="season" class="visually-hidden">Season</label>
+                    <select name="season" id="season" onchange="this.form.submit()">
+                        {% for season in seasons %}
+                            <option value="{{ season }}" {% if selected_season == season %}selected{% endif %}>{{ season }} season</option>
+                        {% endfor %}
+                    </select>
+                    <label for="record_week" class="visually-hidden">Record to show</label>
+                    <select name="record_week" id="record_week" onchange="this.form.submit()">
+                        <option value="season" {% if record_week == 'season' %}selected{% endif %}>Whole season</option>
+                        {% for week in weeks %}
+                            <option value="{{ week }}" {% if record_week == week|stringformat:"s" %}selected{% endif %}>Week {{ week }}</option>
+                        {% endfor %}
+                    </select>
+
+                </form>
+            </div>
+
+            <div class="score-row">
+                <div class="score-cell"><span class="score-num">{{ user_stats.wins }}</span><span class="score-label">Wins</span></div>
+                <div class="score-cell"><span class="score-num">{{ user_stats.losses }}</span><span class="score-label">Losses</span></div>
+                <div class="score-cell"><span class="score-num">{{ user_stats.ties }}</span><span class="score-label">Ties</span></div>
+            </div>
+
+            <div class="scoreboard-actions">
+                <a href="{% url 'picks' %}?season={{ selected_season }}" class="btn btn-red">Make picks</a>
+                <a href="{% url 'leaderboard' %}?season={{ selected_season }}" class="btn btn-quiet">Leaderboard</a>
+            </div>
+        </section>
+        {% if pending_challenges %}
         <div class="cmd-stats-row">
-            <div class="cmd-stat">
-                <div class="label">Record</div>
-                <div class="value">{% if user_stats %}{{ user_stats.wins }}–{{ user_stats.losses }}–{{ user_stats.ties }}{% else %}—{% endif %}</div>
-            </div>
-            <div class="cmd-stat">
-                <div class="label">Week</div>
-                <div class="value">{{ mission_week }}</div>
-            </div>
-            {% if achievement_summary and achievement_summary.total_unlocked %}
-            <div class="cmd-stat">
-                <div class="label">Trophies</div>
-                <div class="value">{{ achievement_summary.total_unlocked }}</div>
-            </div>
-            {% endif %}
-            {% if pending_challenges %}
             <div class="cmd-stat">
                 <div class="label">Challenges</div>
                 <div class="value">{{ pending_challenges|length }}</div>
             </div>
-            {% endif %}
         </div>
+        {% endif %}
     </section>
-
-    <section class="scoreboard" aria-labelledby="record-title">
-        <div class="scoreboard-head">
-            <h2 id="record-title">Your record</h2>
-            <form method="get" class="inline-form">
-                <label for="season" class="visually-hidden">Season</label>
-                <select name="season" id="season" onchange="this.form.submit()">
-                    {% for season in seasons %}
-                        <option value="{{ season }}" {% if selected_season == season %}selected{% endif %}>{{ season }} season</option>
-                    {% endfor %}
-                </select>
-                <label for="record_week" class="visually-hidden">Record to show</label>
-                <select name="record_week" id="record_week" onchange="this.form.submit()">
-                    <option value="season" {% if record_week == 'season' %}selected{% endif %}>Whole season</option>
-                    {% for week in weeks %}
-                        <option value="{{ week }}" {% if record_week == week|stringformat:"s" %}selected{% endif %}>Week {{ week }}</option>
-                    {% endfor %}
-                </select>
-                <noscript><button type="submit" class="btn btn-sm">Show</button></noscript>
-            </form>
-        </div>
-
-        <div class="score-row">
-            <div class="score-cell"><span class="score-num">{{ user_stats.wins }}</span><span class="score-label">Wins</span></div>
-            <div class="score-cell"><span class="score-num">{{ user_stats.losses }}</span><span class="score-label">Losses</span></div>
-            <div class="score-cell"><span class="score-num">{{ user_stats.ties }}</span><span class="score-label">Ties</span></div>
-        </div>
-
-        <div class="scoreboard-actions">
-            <a href="{% url 'picks' %}?season={{ selected_season }}" class="btn btn-red">Make picks</a>
-            <a href="{% url 'leaderboard' %}?season={{ selected_season }}" class="btn btn-quiet">Leaderboard</a>
-        </div>
-    </section>
-
 
     <section class="section" aria-labelledby="stats-title">
         <div class="section-head"><h2 id="stats-title">Your stats</h2></div>
@@ -125,32 +111,59 @@ document.addEventListener('DOMContentLoaded', function () {
             <div class="stat"><span class="stat-num">{{ my_stats.challenge_record }}</span><span class="stat-label">Head-to-head &middot; {{ my_stats.battles }} battle{{ my_stats.battles|pluralize }}</span></div>
         </div>
 
-        <a href="{% url 'challenges' %}" class="challenge-link">
-            <span>
-                <strong>Head-to-head challenges</strong>
-                <small>
-                    {% if pending_challenges %}{{ pending_challenges }} waiting for your answer{% else %}Challenge a friend to a game or a week.{% endif %}
-                </small>
-            </span>
-            {% if pending_challenges %}<span class="count-badge">{{ pending_challenges }}</span>{% endif %}
-        </a>
+        <section class="path-playoffs section-card emphasis-{{ path_playoffs.status }}" aria-labelledby="path-title">
+            <div class="section-head">
+                <h2 id="path-title">Path to playoffs</h2>
+            </div>
+            <p class="path-headline"><strong>{{ path_playoffs.headline }}</strong></p>
+            <p class="muted path-detail">{{ path_playoffs.detail }}</p>
+            <div class="row path-pills" style="gap:12px;flex-wrap:wrap">
+                {% if path_playoffs.division %}<span class="pill">{{ path_playoffs.division }}</span>{% endif %}
+                {% if path_playoffs.division_rank %}<span class="pill">#{{ path_playoffs.division_rank }}</span>{% endif %}
+                {% if path_playoffs.qualified %}<span class="pill pill-gold">Qualified</span>{% endif %}
+            </div>
+            {% if narratives %}
+            <div class="narrative-rail path-narratives" aria-label="Season storylines">
+                {% for story in narratives %}
+                    <article class="narrative-card emphasis-{{ story.emphasis }}">
+                        <span class="narrative-icon" aria-hidden="true">{{ story.icon }}</span>
+                        <div>
+                            <strong>{{ story.headline }}</strong>
+                            <p>{{ story.detail }}</p>
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+            {% endif %}
+            <div class="path-cta-row">
+                {% if path_playoffs.qualified %}
+                    <a href="{% url 'playoffs' %}" class="btn btn-red btn-sm">Playoff bracket</a>
+                    <a href="{% url 'leaderboard' %}?tab=division{% if path_playoffs.division %}&amp;division={{ path_playoffs.division|urlencode }}{% endif %}" class="btn btn-quiet btn-sm">Division race</a>
+                {% else %}
+                    <a href="{% url 'leaderboard' %}?tab=division{% if path_playoffs.division %}&amp;division={{ path_playoffs.division|urlencode }}{% endif %}" class="btn btn-red btn-sm">Division race</a>
+                    <a href="{% url 'playoffs' %}" class="btn btn-quiet btn-sm">Playoff bracket</a>
+                {% endif %}
+                <a href="{% url 'divisions' %}{% if path_playoffs.division %}?division={{ path_playoffs.division|urlencode }}{% endif %}" class="path-cta-quiet">How qualification works</a>
+            </div>
+        </section>
     </section>
 
-    <section class="path-playoffs section-card emphasis-{{ path_playoffs.status }}" aria-labelledby="path-title">
-        <div class="section-head">
-            <h2 id="path-title">Path to playoffs</h2>
-            <a href="{% url 'playoffs' %}">Bracket</a>
-        </div>
-        <p class="path-headline"><strong>{{ path_playoffs.headline }}</strong></p>
-        <p class="muted" style="margin:0 0 8px">{{ path_playoffs.detail }}</p>
-        <div class="row" style="gap:12px;flex-wrap:wrap">
-            {% if path_playoffs.division %}<span class="pill">{{ path_playoffs.division }}</span>{% endif %}
-            {% if path_playoffs.record %}<span class="pill">{{ path_playoffs.record }}</span>{% endif %}
-            {% if path_playoffs.division_rank %}<span class="pill">#{{ path_playoffs.division_rank }}</span>{% endif %}
-            {% if path_playoffs.qualified %}<span class="pill pill-gold">Qualified</span>{% endif %}
-        </div>
-    </section>
-
+    {% if relay_join_events %}
+    <a href="{% url 'relaywars:home' %}" class="relay-wars-banner" aria-label="Relay Wars is open — join a team">
+        <span class="relay-wars-banner-kicker">NEW EVENT OPEN</span>
+        <span class="relay-wars-banner-title">Relay Wars</span>
+        <span class="relay-wars-banner-detail">
+            {% with next_event=relay_join_events.0 %}
+            Week {{ next_event.week }} is open for teams
+            {% if relay_join_events|length > 1 %}
+            · {{ relay_join_events|length }} weeks available
+            {% endif %}
+            · Join before kickoff
+            {% endwith %}
+        </span>
+        <span class="relay-wars-banner-cta">Enter Relay Wars <span aria-hidden="true">→</span></span>
+    </a>
+    {% endif %}
 
     <section class="weekly-race" aria-labelledby="weekly-race-title">
         <div class="weekly-race-head">
@@ -199,7 +212,7 @@ document.addEventListener('DOMContentLoaded', function () {
         <summary class="dashboard-disclosure-summary">
             <span class="dashboard-disclosure-title">
                 <strong>Side quests &amp; missions</strong>
-                <small>Weekly mission · Dog Hunt · Quests</small>
+                <small>Weekly mission · Dog Hunt · Challenges · Missions</small>
             </span>
             <span class="dashboard-disclosure-indicator" aria-hidden="true">＋</span>
         </summary>
@@ -242,12 +255,33 @@ document.addEventListener('DOMContentLoaded', function () {
         {% endif %}
     </section>
             {% endif %}
+            <a href="{% url 'crossfire' %}?week={{ mission_week }}" class="challenge-link" style="margin-top:4px">
+                <span>
+                    <strong>Crossfire</strong>
+                    <small>Target opposing picks · 3 shots per week</small>
+                </span>
+                <span aria-hidden="true">🎯</span>
+            </a>
+            <a href="{% url 'challenges' %}" class="challenge-link" style="margin-top:4px">
+                <span>
+                    <strong>Head-to-head challenges</strong>
+                    <small>
+                        {% if pending_challenges %}{{ pending_challenges }} waiting for your answer{% else %}Challenge a friend to a game or a week.{% endif %}
+                    </small>
+                </span>
+                {% if pending_challenges %}<span class="count-badge">{{ pending_challenges }}</span>{% endif %}
+            </a>
             {% if weekly_quests and weekly_quests.quests %}
-            <section class="quest-board section-card" aria-labelledby="quest-board-title">
-        <div class="section-head">
-            <h2 id="quest-board-title">Week {{ weekly_quests.week }} quests</h2>
-            <span class="pill {% if weekly_quests.all_complete %}pill-gold{% endif %}">{{ weekly_quests.completed }}/{{ weekly_quests.total }}</span>
-        </div>
+            <details class="mission-board section-card">
+                <summary class="dashboard-disclosure-summary mission-board-summary">
+                    <span class="dashboard-disclosure-title">
+                        <strong id="quest-board-title">Week {{ weekly_quests.week }} missions</strong>
+                        <small>{{ weekly_quests.completed }}/{{ weekly_quests.total }} complete</small>
+                    </span>
+                    <span class="pill {% if weekly_quests.all_complete %}pill-gold{% endif %}">{{ weekly_quests.completed }}/{{ weekly_quests.total }}</span>
+                    <span class="dashboard-disclosure-indicator" aria-hidden="true">＋</span>
+                </summary>
+                <div class="mission-board-content">
         <ul class="quest-list">
             {% for q in weekly_quests.quests %}
             <li class="quest-item {% if q.complete %}is-complete{% endif %}">
@@ -267,6 +301,8 @@ document.addEventListener('DOMContentLoaded', function () {
                         <a class="btn btn-sm btn-quiet" href="{% url 'picks' %}?season={{ selected_season }}&amp;week={{ weekly_quests.week }}">{{ q.cta_label }}</a>
                     {% elif q.cta == 'challenges' %}
                         <a class="btn btn-sm btn-quiet" href="{% url 'challenges' %}">{{ q.cta_label }}</a>
+                    {% elif q.cta == 'crossfire' %}
+                        <a class="btn btn-sm btn-quiet" href="{% url 'crossfire' %}?week={{ weekly_quests.week }}">{{ q.cta_label }}</a>
                     {% endif %}
                 {% else %}
                     <span class="pill pill-win">Done</span>
@@ -275,76 +311,13 @@ document.addEventListener('DOMContentLoaded', function () {
             {% endfor %}
         </ul>
         {% if weekly_quests.all_complete %}
-        <p class="muted" style="margin:12px 0 0;font-size:0.9rem">All weekly quests complete. Nice work, coach.</p>
+        <p class="muted" style="margin:12px 0 0;font-size:0.9rem">All weekly missions complete. Nice work, coach.</p>
         {% endif %}
-    </section>
+                </div>
+            </details>
             {% endif %}
         </div>
     </details>
-
-
-    {% if live_moments and live_moments.live_games or live_moments.reactions %}
-    <details class="live-energy section-card">
-        <summary class="dashboard-disclosure-summary">
-            <span class="dashboard-disclosure-title">
-                <strong>🔴 Live energy</strong>
-                <small>Live games and friend reactions</small>
-            </span>
-            <span class="dashboard-disclosure-indicator" aria-hidden="true">＋</span>
-        </summary>
-        <div class="dashboard-live-content">
-        <div class="section-head">
-            <a href="{% url 'picks' %}?season={{ selected_season }}&amp;week={{ mission_week }}">View games</a>
-        </div>
-        {% if live_moments.live_games %}
-        <ul class="live-game-list">
-            {% for g in live_moments.live_games %}
-            <li class="live-game-row">
-                <span class="pill pill-live">{{ g.status|upper }}</span>
-                <strong>{{ g.away_team }} {% if g.away_score is not None %}{{ g.away_score }}{% endif %} @ {{ g.home_team }} {% if g.home_score is not None %}{{ g.home_score }}{% endif %}</strong>
-                <form method="post" action="{% url 'react_to_game' g.game_id %}" class="live-react-form">
-                    {% csrf_token %}
-                    <input type="hidden" name="next" value="{% url 'dashboard' %}">
-                    <button type="submit" name="emoji" value="🔥" class="reaction-btn" title="Fire">🔥</button>
-                    <button type="submit" name="emoji" value="😱" class="reaction-btn" title="Shock">😱</button>
-                    <button type="submit" name="emoji" value="💪" class="reaction-btn" title="Clutch">💪</button>
-                    <button type="submit" name="emoji" value="🎉" class="reaction-btn" title="Party">🎉</button>
-                    <button type="submit" name="emoji" value="💔" class="reaction-btn" title="Heartbreak">💔</button>
-                </form>
-            </li>
-            {% endfor %}
-        </ul>
-        {% endif %}
-        {% if live_moments.reactions %}
-        <ul class="activity-list" style="margin-top:10px">
-            {% for r in live_moments.reactions %}
-            <li class="activity-item">
-                <span class="activity-icon">{{ r.emoji }}</span>
-                <div class="activity-body">
-                    <p><strong>{{ r.user.username }}</strong> on {{ r.game.away_team }} @ {{ r.game.home_team }}</p>
-                    <p class="detail">{{ r.created_at|timesince }} ago</p>
-                </div>
-            </li>
-            {% endfor %}
-        </ul>
-        {% endif %}
-    </div>
-    </details>
-    {% endif %}
-
-    {% if narratives %}
-    <section class="narrative-rail" aria-label="Season storylines">
-        {% for story in narratives %}
-            <article class="narrative-card emphasis-{{ story.emphasis }}">
-                <span class="narrative-icon" aria-hidden="true">{{ story.icon }}</span>
-                <div>
-                    <strong>{{ story.headline }}</strong>
-                    <p>{{ story.detail }}</p>
-                </div>
-            </article>
-        {% endfor %}
-    </section>
-    {% endif %}
 
 
     {% if confidence_board_preview %}
@@ -368,26 +341,30 @@ document.addEventListener('DOMContentLoaded', function () {
     <section class="section" aria-labelledby="achievement-showcase-title">
         <div class="section-head">
             <h2 id="achievement-showcase-title">Trophy case</h2>
-            <a href="{% url 'achievements' %}">{{ achievement_summary.unlocked_count }} of {{ achievement_summary.total_levels }} unlocked</a>
+            <a href="{% url 'achievements' %}">See all · {{ achievement_summary.unlocked_count }} of {{ achievement_summary.total_levels }}</a>
         </div>
+        {% if achievement_summary.recent %}
         <div class="trophy-grid">
-            {% for achievement in achievement_summary.cards %}
-                {% if achievement.unlocked_count or forloop.counter <= 3 %}
-                    <div class="trophy {% if achievement.complete %}is-complete{% endif %} {% if not achievement.unlocked_count %}is-locked{% endif %}">
-                        <span class="trophy-icon" aria-hidden="true">{% if achievement.icon %}{{ achievement.icon }}{% elif achievement.complete %}🏆{% elif achievement.unlocked_count %}🥇{% else %}🔒{% endif %}</span>
-                        <strong>{{ achievement.title }}</strong>
-                        <span class="muted">{{ achievement.unlocked_count }}/{{ achievement.total_levels }} levels</span>
-                        {% if achievement.next_threshold %}
-                            <div class="progress-track" role="progressbar" aria-label="{{ achievement.title }} progress" aria-valuemin="0" aria-valuemax="{{ achievement.next_threshold }}" aria-valuenow="{{ achievement.next_progress }}">
-                                <span style="width:{{ achievement.next_percent }}%"></span>
-                            </div>
-                        {% else %}
-                            <span class="pill">Complete</span>
-                        {% endif %}
-                    </div>
-                {% endif %}
+            {% for trophy in achievement_summary.recent %}
+                <div class="trophy {% if trophy.complete %}is-complete{% endif %}">
+                    <span class="trophy-icon" aria-hidden="true">{{ trophy.icon|default:"🏆" }}</span>
+                    <strong>{{ trophy.title }}</strong>
+                    <span class="muted">Stage {{ trophy.level }} · {{ trophy.milestone }}</span>
+                    {% if trophy.unlocked_at %}
+                        <span class="muted">{{ trophy.unlocked_at|date:"M j" }}</span>
+                    {% endif %}
+                </div>
             {% endfor %}
         </div>
+        {% if achievement_summary.unlocked_count > 4 %}
+        <p class="trophy-see-all">
+            <a href="{% url 'achievements' %}">See all trophies <span aria-hidden="true">→</span></a>
+        </p>
+        {% endif %}
+        {% else %}
+        <p class="empty muted">No trophies yet. Lock in picks and climb the board to start filling the case.</p>
+        <p class="trophy-see-all"><a href="{% url 'achievements' %}">Browse all achievements <span aria-hidden="true">→</span></a></p>
+        {% endif %}
     </section>
 
     <section class="section" aria-labelledby="activity-feed-title">
@@ -410,7 +387,7 @@ document.addEventListener('DOMContentLoaded', function () {
         {% endif %}
     </section>
 
-<!-- Friends drawer toggle -->
+<!-- Social drawer toggle -->
     <button
         type="button"
         class="friends-toggle"
@@ -419,28 +396,31 @@ document.addEventListener('DOMContentLoaded', function () {
         aria-expanded="false"
     >
         <span aria-hidden="true">👥</span>
-        Friends
+        Social
     </button>
 
     <!-- Backdrop -->
     <div class="friends-backdrop" id="friendsBackdrop"></div>
 
-    <!-- Slide-out friends drawer -->
+    <!-- Slide-out social drawer (Friends + Live energy) -->
     <aside
         class="friends-drawer"
         id="friendsDrawer"
-        aria-label="Friends panel"
+        aria-label="Social panel"
         aria-hidden="true"
     >
         <div class="friends-drawer-header">
-            <h2>Friends</h2>
+            <h2>Social</h2>
             <button
                 type="button"
                 class="friends-close"
                 id="friendsClose"
-                aria-label="Close friends panel"
+                aria-label="Close social panel"
             >&times;</button>
         </div>
+
+        <div class="social-drawer-body">
+        <div class="social-section is-active" id="socialSectionFriends" data-social-section="friends">
 
         <form method="get" class="friend-search-form">
             <input type="hidden" name="season" value="{{ selected_season }}">
@@ -617,6 +597,102 @@ document.addEventListener('DOMContentLoaded', function () {
             {% endfor %}
         </div>
 
+        </div><!-- /#socialSectionFriends -->
+
+        <div class="social-section" id="socialSectionLive" data-social-section="live" hidden>
+            <div class="section-head" style="margin-bottom:10px">
+                <h3 style="margin:0">🔴 Live energy</h3>
+                <a href="{% url 'picks' %}?season={{ selected_season }}&amp;week={{ mission_week }}">View games</a>
+            </div>
+            {% if live_moments and live_moments.live_games %}
+            <ul class="live-game-list" id="socialLiveGameList">
+                {% for g in live_moments.live_games %}
+                <li class="live-game-row" data-live-game>
+                    <button type="button" class="live-game-toggle" aria-expanded="false">
+                        <span class="pill pill-live">{{ g.status|upper }}</span>
+                        <strong>{{ g.away_team }} {% if g.away_score is not None %}{{ g.away_score }}{% endif %} @ {{ g.home_team }} {% if g.home_score is not None %}{{ g.home_score }}{% endif %}</strong>
+                    </button>
+                    <form method="post" action="{% url 'react_to_game' g.game_id %}" class="live-react-form" hidden>
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{% url 'dashboard' %}">
+                        <button type="submit" name="emoji" value="🔥" class="reaction-btn" title="Fire">🔥</button>
+                        <button type="submit" name="emoji" value="😱" class="reaction-btn" title="Shock">😱</button>
+                        <button type="submit" name="emoji" value="💪" class="reaction-btn" title="Clutch">💪</button>
+                        <button type="submit" name="emoji" value="🎉" class="reaction-btn" title="Party">🎉</button>
+                        <button type="submit" name="emoji" value="💔" class="reaction-btn" title="Heartbreak">💔</button>
+                    </form>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="friends-empty-message">No live games right now. Check back during kickoff windows.</p>
+            {% endif %}
+            {% if live_moments and live_moments.reactions %}
+            <ul class="activity-list" style="margin-top:10px">
+                {% for r in live_moments.reactions %}
+                <li class="activity-item">
+                    <span class="activity-icon">{{ r.emoji }}</span>
+                    <div class="activity-body">
+                        <p><strong>{{ r.user.username }}</strong> on {{ r.game.away_team }} @ {{ r.game.home_team }}</p>
+                        <p class="detail">{{ r.created_at|timesince }} ago</p>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div><!-- /#socialSectionLive -->
+
+        <div class="social-section" id="socialSectionMoments" data-social-section="moments" hidden>
+            <div class="section-head" style="margin-bottom:10px">
+                <h3 style="margin:0">✨ Shared Moments</h3>
+                <a href="{% url 'share_hub' %}">View all</a>
+            </div>
+            <p class="muted" style="margin:0 0 12px">Your perfect weeks and head-to-head rivalry moments, ready to share.</p>
+            <section class="shared-moment-group">
+                <h4>Perfect weeks · {{ selected_season }}</h4>
+                {% if shared_moment_weeks %}
+                    <ul class="stack" style="list-style:none;padding:0">
+                        {% for item in shared_moment_weeks %}
+                            <li class="row">
+                                <span>🏆 Week {{ item.week }} · {{ item.record.wins }}-0-0</span>
+                                <a class="btn btn-sm" href="{% url 'share_perfect_week' request.user.id selected_season item.week %}">Open card</a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="friends-empty-message">No perfect weeks yet. Get every pick right in a week to unlock a share card.</p>
+                {% endif %}
+            </section>
+            <section class="shared-moment-group" style="margin-top:18px">
+                <h4>Rivalries</h4>
+                {% if shared_moment_challenges %}
+                    <ul class="stack" style="list-style:none;padding:0">
+                        {% for c in shared_moment_challenges %}
+                            <li class="row">
+                                <span>{{ c.challenger.username }} vs {{ c.opponent.username }} · W{{ c.week }}</span>
+                                <a class="btn btn-sm btn-quiet" href="{% url 'share_challenge' c.id %}">Card</a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="friends-empty-message">Challenge a friend to create a rivalry moment.</p>
+                {% endif %}
+            </section>
+        </div><!-- /#socialSectionMoments -->
+        </div><!-- /.social-drawer-body -->
+
+        <nav class="social-bottom-nav" role="tablist" aria-label="Social sections">
+            <button type="button" class="social-nav-btn is-active" id="socialNavFriends" role="tab" aria-selected="true" aria-controls="socialSectionFriends" data-social-nav="friends">
+                Friends
+            </button>
+            <button type="button" class="social-nav-btn" id="socialNavLive" role="tab" aria-selected="false" aria-controls="socialSectionLive" data-social-nav="live">
+                Live energy
+            </button>
+            <button type="button" class="social-nav-btn" id="socialNavMoments" role="tab" aria-selected="false" aria-controls="socialSectionMoments" data-social-nav="moments">
+                Moments
+            </button>
+        </nav>
+
     </aside>
 </div>
 
@@ -712,6 +788,71 @@ document.addEventListener('DOMContentLoaded', function () {
             activateFriendsTab(true);
         });
     }
+
+    // Social drawer: Friends, Live energy, and Shared Moments bottom navigation.
+    const socialSections = {
+        friends: document.getElementById('socialSectionFriends'),
+        live: document.getElementById('socialSectionLive'),
+        moments: document.getElementById('socialSectionMoments'),
+    };
+    const socialNavButtons = {
+        friends: document.getElementById('socialNavFriends'),
+        live: document.getElementById('socialNavLive'),
+        moments: document.getElementById('socialNavMoments'),
+    };
+
+    function activateSocialSection(section) {
+        Object.entries(socialSections).forEach(([key, element]) => {
+            if (!element) return;
+            const active = key === section;
+            element.hidden = !active;
+            element.classList.toggle('is-active', active);
+        });
+        Object.entries(socialNavButtons).forEach(([key, button]) => {
+            if (!button) return;
+            const active = key === section;
+            button.classList.toggle('is-active', active);
+            button.setAttribute('aria-selected', String(active));
+        });
+    }
+
+    Object.entries(socialNavButtons).forEach(([section, button]) => {
+        if (button) button.addEventListener('click', () => activateSocialSection(section));
+    });
+
+    // Live energy accordion: one game's emotes open at a time
+    const liveGameList = document.getElementById('socialLiveGameList');
+    if (liveGameList) {
+        liveGameList.querySelectorAll('[data-live-game]').forEach(function (row) {
+            const toggleBtn = row.querySelector('.live-game-toggle');
+            const form = row.querySelector('.live-react-form');
+            if (!toggleBtn || !form) return;
+            toggleBtn.addEventListener('click', function () {
+                const opening = !row.classList.contains('is-open');
+                liveGameList.querySelectorAll('[data-live-game].is-open').forEach(function (openRow) {
+                    if (openRow === row) return;
+                    openRow.classList.remove('is-open');
+                    const openForm = openRow.querySelector('.live-react-form');
+                    const openToggle = openRow.querySelector('.live-game-toggle');
+                    if (openForm) openForm.hidden = true;
+                    if (openToggle) openToggle.setAttribute('aria-expanded', 'false');
+                });
+                row.classList.toggle('is-open', opening);
+                form.hidden = !opening;
+                toggleBtn.setAttribute('aria-expanded', String(opening));
+            });
+        });
+    }
+
+    // Alerts: open Social drawer on Requests tab
+    document.querySelectorAll('[data-open-friend-requests]').forEach(function (link) {
+        link.addEventListener('click', function (event) {
+            event.preventDefault();
+            activateSocialSection('friends');
+            openDrawer();
+            activateFriendsTab(true);
+        });
+    });
 
 });
 </script>

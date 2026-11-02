@@ -643,6 +643,8 @@ def refresh_achievement_unlocks(user):
             'unlocked_at': milestone['unlocked_at'],
             'key': card['key'],
             'level': milestone['level'],
+            'icon': card['icon'],
+            'complete': card['complete'] and milestone['level'] == card['total_levels'],
         }
         for card in cards for milestone in card['milestones'] if milestone['unlocked']
     ]
@@ -650,7 +652,7 @@ def refresh_achievement_unlocks(user):
     total_levels = sum(card['total_levels'] for card in cards)
     return {
         'cards': cards,
-        'recent': unlocked[:5],
+        'recent': unlocked[:4],
         'unlocked_count': len(unlocked),
         'total_unlocked': len(unlocked),  # alias for dashboard templates
         'total_levels': total_levels,
