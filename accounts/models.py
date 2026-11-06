@@ -443,3 +443,64 @@ class Crossfire(models.Model):
 
     def __str__(self):
         return f'{self.attacker_id} → {self.target_id} on {self.game_id} (W{self.week})'
+
+
+class LiveChatRoom(models.Model):
+    """One chat room per game, opened from that game's window in the Social drawer.
+
+    A room is "live" while someone has posted publicly within the last few
+    minutes. `went_live_at` / `started_by` are refreshed every time the room
+    goes from idle to live, which is what the site-wide "chat is live"
+    announcement keys off.
+    """
+    game = models.OneToOneField(Game, on_delete=models.CASCADE, related_name='chat_room')
+    started_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name='+',
+    )
+    went_live_at = models.DateTimeField()
+    last_message_at = models.DateTimeField()
+
+    def __str__(self):
+        return f'Chat: {self.game}'
+
+
+class LiveChatMessage(models.Model):
+    """A single line in a live chat room (World-of-Warcraft-vanilla style).
+
+    kinds: say (public), emote (/me), react (emoji reaction), whisper (friend
+    to friend, only those two ever receive it) and system (room announcements).
+    """
+    SAY = 'say'
+    EMOTE = 'emote'
+    REACT = 'react'
+    WHISPER = 'whisper'
+    SYSTEM = 'system'
+    KIND_CHOICES = [
+        (SAY, 'Say'),
+        (EMOTE, 'Emote'),
+        (REACT, 'Reaction'),
+        (WHISPER, 'Whisper'),
+        (SYSTEM, 'System'),
+    ]
+
+    room = models.ForeignKey(LiveChatRoom, on_delete=models.CASCADE, related_name='messages')
+    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='live_chat_messages')
+    recipient = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.CASCADE, related_name='live_chat_whispers',
+    )
+    kind = models.CharField(max_length=8, choices=KIND_CHOICES, default=SAY)
+    body = models.CharField(max_length=240)
+    created_at = models.DateTimeField(auto_now_add=True)
+    # Soft delete so a moderator can hide a line without losing the record.
+    is_hidden = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['id']
+        indexes = [
+            models.Index(fields=['room', 'id'], name='acc_chat_room_id_idx'),
+            models.Index(fields=['recipient', 'id'], name='acc_chat_rcpt_id_idx'),
+            models.Index(fields=['author', 'id'], name='acc_chat_auth_id_idx'),
+        ]
+
+    def __str__(self):
+        return f'{self.author_id} [{self.kind}] {self.body[:30]}'

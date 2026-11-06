@@ -37,7 +37,7 @@ Authoritative overview of the running system (as of audit Stage 3).
 ## Scheduled jobs
 
 External cron → `GET/POST /api/sync/` with header `X-Sync-Token`.  
-No continuous worker required. Sync is safe to re-run.
+No continuous worker required. Sync is safe to re-run. After schedule/score updates, it automatically freezes the playoff field once all 18 regular-season weeks are final and applies the existing weekly cuts once each complete playoff round is final. The same staff commands remain available for manual overrides. Super Bowl Squares remains a staff-dealt board with a 50-player maximum; this cap never changes playoff qualification or playoff field size.
 
 ## Management commands
 

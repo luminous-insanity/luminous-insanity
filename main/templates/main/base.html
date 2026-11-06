@@ -36,7 +36,7 @@
                 {% if user.is_authenticated %}
                     <a href="{% url 'picks' %}" {% if page == 'picks' %}aria-current="page"{% endif %}>Picks</a>
                     <a href="{% url 'leaderboard' %}" {% if page == 'leaderboard' %}aria-current="page"{% endif %}>Leaderboard</a>
-                    <a href="{% url 'dashboard' %}" {% if page == 'dashboard' %}aria-current="page"{% endif %}>Dashboard</a>
+                    <a href="{% url 'dashboard' %}" data-chat-dot {% if page == 'dashboard' %}aria-current="page"{% endif %}>Dashboard</a>
                 {% else %}
                     <a href="{% url 'leaderboard' %}" {% if page == 'leaderboard' %}aria-current="page"{% endif %}>Leaderboard</a>
                 {% endif %}
@@ -82,7 +82,7 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20V11M12 20V5M18 20v-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
                 <span>Leaderboard</span>
             </a>
-            <a href="{% url 'dashboard' %}" {% if page == 'dashboard' %}aria-current="page"{% endif %}>
+            <a href="{% url 'dashboard' %}" data-chat-dot {% if page == 'dashboard' %}aria-current="page"{% endif %}>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 20c.8-3.6 3.6-5.4 7-5.4s6.2 1.8 7 5.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
                 <span>Dashboard</span>
             </a>
@@ -129,6 +129,12 @@
             <p class="foot-copy">&copy; {% now "Y" %} GameDayPicks</p>
         </div>
     </footer>
+
+    {% if user.is_authenticated %}
+    <div id="gdpChatLive" data-status-url="{% url 'chat_status' %}" data-dashboard-url="{% url 'dashboard' %}" hidden></div>
+    <div class="chat-toasts" id="chatToasts" aria-live="polite"></div>
+    <script src="{% static 'js/chat_live.js' %}"></script>
+    {% endif %}
 
     <script>
         (function () {

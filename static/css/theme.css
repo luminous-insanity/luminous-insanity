@@ -1740,3 +1740,123 @@ body {
     color: white; background: linear-gradient(145deg, color-mix(in srgb, var(--gold) 22%, var(--surface)), var(--surface));
 }
 .cmd-trophy:hover { filter: brightness(1.05); }
+
+/* =====================================================================
+   LIVE CHAT (Social drawer) - World of Warcraft vanilla style lines.
+   Team colors: the signed-in player's favorite team drives --primary /
+   --on-primary (set on <html>), and each chat line carries its author's
+   team badge. Say = ink, emote = orange, whisper = pink/violet (friends
+   only), friend lines = gold bar + star, system = muted italic.
+   ===================================================================== */
+.gchat {
+    --chat-whisper: #a21caf;
+    --chat-emote: #c2410c;
+}
+:root[data-theme="dark"] .gchat {
+    --chat-whisper: #f0abfc;
+    --chat-emote: #fb923c;
+}
+.gchat-games { margin-bottom: 10px; }
+.gchat-games .live-game-row { border: 1px solid transparent; }
+.gchat-games .live-game-row.is-selected {
+    border-color: var(--primary);
+    background: color-mix(in srgb, var(--primary) 10%, var(--surface-2));
+}
+/* no-JS fallback: the original reaction buttons inside <noscript> */
+.gchat-games .live-react-form { display: flex; width: 100%; margin-top: 4px; }
+.gchat-live-badge { margin-left: auto; font-size: .72rem; font-weight: 750; color: var(--live); white-space: nowrap; }
+
+.gchat-panel { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--surface); }
+.gchat-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 10px 12px; border-bottom: 1px solid var(--line);
+    background: color-mix(in srgb, var(--primary) 12%, var(--surface-2));
+}
+.gchat-head strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .95rem; }
+.gchat-log {
+    height: min(44vh, 360px); overflow-y: auto; overscroll-behavior: contain;
+    padding: 8px 10px; background: var(--bg); font-size: .9rem; line-height: 1.4; word-break: break-word;
+}
+.gchat-line { padding: 2px 4px 2px 6px; border-left: 3px solid transparent; border-radius: 0 6px 6px 0; }
+.gchat-time { margin-right: 6px; color: var(--muted); font-size: .72rem; }
+.gchat-team {
+    display: inline-block; margin-right: 5px; padding: 0 5px; border-radius: 4px;
+    font-size: .65rem; font-weight: 800; letter-spacing: .04em; vertical-align: 1px;
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink) 22%, transparent);
+}
+.gchat-name { padding: 0; border: 0; background: none; font: inherit; font-weight: 800; color: var(--ink); }
+button.gchat-name { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+button.gchat-name:hover { text-decoration-style: solid; }
+.gchat-colon, .gchat-pre { color: var(--muted); }
+.gchat-text { color: var(--ink); }
+.gchat-line.is-mine { background: color-mix(in srgb, var(--primary) 9%, transparent); }
+.gchat-line.is-friend { border-left-color: var(--gold); background: color-mix(in srgb, var(--gold) 13%, transparent); }
+.gchat-star { margin-right: 4px; color: var(--gold); font-size: .8rem; }
+.gchat-emote .gchat-name, .gchat-emote .gchat-text,
+.gchat-react .gchat-name, .gchat-react .gchat-pre { color: var(--chat-emote); }
+.gchat-emoji { font-size: 1.1rem; vertical-align: -1px; }
+.gchat-whisper {
+    border-left-color: var(--chat-whisper);
+    background: color-mix(in srgb, var(--chat-whisper) 11%, transparent);
+}
+.gchat-whisper .gchat-name, .gchat-whisper .gchat-text,
+.gchat-whisper .gchat-pre, .gchat-whisper .gchat-colon { color: var(--chat-whisper); }
+.gchat-system { color: var(--muted); font-style: italic; }
+.gchat-system .gchat-text { color: inherit; }
+.gchat-error .gchat-text { color: var(--loss); }
+
+.gchat-start { padding: 12px; text-align: center; border-top: 1px solid var(--line); background: var(--surface-2); }
+.gchat-start p { margin: 0 0 8px; color: var(--muted); font-size: .88rem; }
+.gchat-emotes { display: flex; gap: 6px; padding: 8px 10px; border-top: 1px solid var(--line); }
+.gchat-emotes .reaction-btn {
+    flex: 1; min-height: 40px; padding: 4px 0; font-size: 1.1rem; cursor: pointer;
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px;
+}
+.gchat-emotes .reaction-btn:hover:not(:disabled) { border-color: var(--primary); }
+.gchat-emotes .reaction-btn:disabled, .gchat-send:disabled { opacity: .5; cursor: not-allowed; }
+.gchat-form { padding: 8px 10px 10px; border-top: 1px solid var(--line); }
+.gchat-target {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;
+    padding: 4px 10px; border-radius: 8px; font-size: .85rem; color: var(--chat-whisper);
+    background: color-mix(in srgb, var(--chat-whisper) 12%, var(--surface));
+}
+.gchat-target button { border: 0; background: none; color: inherit; font-size: 1.2rem; line-height: 1; cursor: pointer; }
+.gchat-input-row { display: flex; gap: 8px; }
+.gchat-input-row input { flex: 1; min-width: 0; min-height: 44px; font-size: 16px; }
+.gchat-input-row input.is-whisper { border-color: var(--chat-whisper); }
+.gchat-send {
+    min-height: 44px; padding: 0 16px; border: 0; border-radius: 10px; cursor: pointer;
+    background: var(--primary); color: var(--on-primary, #fff); font: inherit; font-weight: 750;
+}
+.gchat-reactions { margin-top: 12px; }
+.gchat-reactions summary { cursor: pointer; color: var(--muted); font-weight: 700; font-size: .9rem; }
+
+/* Site-wide "chat is live" toast + pulsing dots */
+.chat-toasts {
+    position: fixed; z-index: 2200; top: 72px; left: 50%; transform: translateX(-50%);
+    display: grid; gap: 8px; width: min(420px, calc(100vw - 24px)); pointer-events: none;
+}
+.chat-toast {
+    pointer-events: auto; display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+    background: var(--surface); color: var(--ink); border: 1px solid var(--line);
+    border-left: 5px solid var(--primary); border-radius: 14px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .35); animation: chat-toast-in .25s ease-out;
+}
+.chat-toast.is-whisper { border-left-color: #c026d3; }
+.chat-toast-body { flex: 1; min-width: 0; display: grid; font-size: .9rem; }
+.chat-toast-body span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-toast-close { border: 0; background: none; color: var(--muted); font-size: 1.3rem; line-height: 1; cursor: pointer; }
+@keyframes chat-toast-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+
+.has-live-chat::after {
+    content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+    background: var(--live); animation: chat-live-pulse 1.6s infinite;
+}
+.friends-toggle.has-live-chat::after { background: var(--gold); }
+a[data-chat-dot].has-live-chat { position: relative; }
+a[data-chat-dot].has-live-chat::after { position: absolute; top: 6px; right: 2px; }
+@keyframes chat-live-pulse {
+    0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--live) 60%, transparent); }
+    70% { box-shadow: 0 0 0 7px transparent; }
+    100% { box-shadow: 0 0 0 0 transparent; }
+}

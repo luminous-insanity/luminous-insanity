@@ -15,7 +15,7 @@ from django.db import IntegrityError, transaction
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from accounts.models import Pick
+from accounts.models import Pick, PlayoffEntry, PlayoffSettings
 from api import services
 from api.helpers_for_tests import (
     FakeApi, hours_from_now, make_final, make_game, raw_game, raw_score,
@@ -360,6 +360,90 @@ class RunSyncTests(TestCase):
         self.assertEqual(playoff_game.week, 19)
         self.assertEqual(playoff_game.season, 2026)
         self.assertEqual(fake.calls, [("getNFLGamesForWeek", 1)])
+
+    def test_automatic_playoff_open_waits_for_all_regular_season_weeks(self):
+        for week in range(1, 18):
+            for game_no in range(1, 17):
+                make_final(make_game(week=week, game_id=f"REG-{week}-{game_no}"), 20, 10)
+        report = {"playoff_actions": []}
+        with patch("accounts.playoff_rounds.open_playoffs") as open_field:
+            services._process_playoff_lifecycle(report)
+        open_field.assert_not_called()
+        self.assertEqual(report["playoff_actions"], [])
+
+    def test_automatic_open_and_cut_use_existing_playoff_functions(self):
+        for week in range(1, 19):
+            for game_no in range(1, 17):
+                make_final(make_game(week=week, game_id=f"REG-{week}-{game_no}"), 20, 10)
+        for game_no in range(1, 7):
+            make_final(make_game(week=19, game_id=f"WC-{game_no}"), 24, 17)
+
+        user = User.objects.create_user("playoff_auto")
+
+        def open_existing_algorithm(season):
+            PlayoffEntry.objects.create(user=user, season=season)
+            return 1
+
+        def cut_existing_algorithm(season):
+            config = PlayoffSettings.objects.get(season=season)
+            config.rounds_cut += 1
+            config.save(update_fields=["rounds_cut"])
+            return {"round": 1, "round_name": "Wild Card", "before": 1,
+                    "after": 1, "cut": 0}
+
+        report = {"playoff_actions": []}
+        with patch("accounts.playoff_rounds.open_playoffs", side_effect=open_existing_algorithm) as opener, \
+             patch("accounts.playoff_rounds.run_cut", side_effect=cut_existing_algorithm) as cutter:
+            services._process_playoff_lifecycle(report)
+
+        opener.assert_called_once_with(2026)
+        cutter.assert_called_once_with(2026)
+        self.assertEqual([item["action"] for item in report["playoff_actions"]], ["opened", "cut"])
+        self.assertEqual(PlayoffSettings.objects.get(season=2026).rounds_cut, 1)
+
+    def test_automatic_lifecycle_applies_all_three_cuts_once(self):
+        for week in range(1, 19):
+            for game_no in range(1, 17):
+                make_final(make_game(week=week, game_id=f"FULL-REG-{week}-{game_no}"), 20, 10)
+        for week, count in ((19, 6), (20, 4), (21, 2)):
+            for game_no in range(1, count + 1):
+                make_final(make_game(week=week, game_id=f"FULL-{week}-{game_no}"), 24, 17)
+
+        user = User.objects.create_user("playoff_all_cuts")
+
+        def open_existing_algorithm(season):
+            PlayoffEntry.objects.create(user=user, season=season)
+            return 1
+
+        def cut_existing_algorithm(season):
+            config = PlayoffSettings.objects.get(season=season)
+            config.rounds_cut += 1
+            config.save(update_fields=["rounds_cut"])
+            round_no = config.rounds_cut
+            return {"round": round_no, "round_name": ("Wild Card", "Divisional", "Conference")[round_no - 1],
+                    "before": 1, "after": 1, "cut": 0}
+
+        report = {"playoff_actions": []}
+        with patch("accounts.playoff_rounds.open_playoffs", side_effect=open_existing_algorithm), \
+             patch("accounts.playoff_rounds.run_cut", side_effect=cut_existing_algorithm) as cutter:
+            services._process_playoff_lifecycle(report)
+            services._process_playoff_lifecycle({"playoff_actions": []})
+
+        self.assertEqual(cutter.call_count, 3)
+        self.assertEqual(PlayoffSettings.objects.get(season=2026).rounds_cut, 3)
+        self.assertEqual([item["round"] for item in report["playoff_actions"] if item["action"] == "cut"], [1, 2, 3])
+
+    def test_automatic_cut_waits_for_complete_round_schedule(self):
+        user = User.objects.create_user("playoff_wait")
+        PlayoffEntry.objects.create(user=user, season=2026)
+        PlayoffSettings.objects.create(season=2026)
+        for game_no in range(1, 6):
+            make_final(make_game(week=19, game_id=f"PARTIAL-WC-{game_no}"), 24, 17)
+        report = {"playoff_actions": []}
+        with patch("accounts.playoff_rounds.run_cut") as cutter:
+            services._process_playoff_lifecycle(report)
+        cutter.assert_not_called()
+        self.assertEqual(report["playoff_actions"], [])
 
     def test_does_not_open_next_playoff_round_until_current_round_is_final(self):
         make_game(

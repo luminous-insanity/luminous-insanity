@@ -12,20 +12,23 @@ A quarter's winning square is found from the last digit of each score:
 
 BOARD_SIZE = 10
 TOTAL_SQUARES = BOARD_SIZE * BOARD_SIZE
+MAX_SQUARES_PLAYERS = 50
 
 
 def split_squares(player_ids, rng, total=TOTAL_SQUARES):
     """Owner id for each of `total` squares, dealt evenly and shuffled.
 
-    50 players get 2 each. If the players don't divide 100 evenly, everybody
-    gets the same base number and the leftover squares go to randomly chosen
-    players (3 players -> 33, 33 and 34).
+    At most 50 players may participate (two squares each at the maximum). If
+    the players do not divide 100 evenly, everybody gets the same base number
+    and leftover squares go to randomly chosen players (3 players -> 33, 33, 34).
     """
     ids = sorted(player_ids)
     if not ids:
         raise ValueError('There are no players to give squares to.')
-    if len(ids) > total:
-        raise ValueError(f'{len(ids)} players is more than the {total} squares on the board.')
+    if len(ids) > MAX_SQUARES_PLAYERS:
+        raise ValueError(
+            f'{len(ids)} players exceeds the {MAX_SQUARES_PLAYERS}-player Super Bowl Squares limit.'
+        )
     base, extra = divmod(total, len(ids))
     owners = ids * base + rng.sample(ids, extra)
     rng.shuffle(owners)

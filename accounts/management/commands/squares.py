@@ -43,7 +43,7 @@ class Command(BaseCommand):
                 board = build_board(season, rebuild=opts['rebuild'], force=opts['force'])
                 self.stdout.write(self.style.SUCCESS(
                     f'Built the {season} board: 100 squares dealt to '
-                    f'{board.squares.order_by().values("owner").distinct().count()} players.'))
+                    f'{board.squares.order_by().values("owner").distinct().count()} players (maximum 50).'))
             elif action == 'game':
                 if not (opts['home'] and opts['away'] and opts['date']):
                     raise CommandError('game needs --home, --away and --date.')

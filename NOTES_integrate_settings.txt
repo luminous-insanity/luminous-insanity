@@ -1,0 +1,17 @@
+Integrate carefully (Layer 2 only):
+
+1) Add to INSTALLED_APPS:
+   rest_framework
+   rest_framework_simplejwt.token_blacklist
+   mobileapi
+
+2) Middleware (after SecurityMiddleware is fine):
+   mobileapi.middleware.MobileApiNoStoreMiddleware
+
+3) REST_FRAMEWORK + SIMPLE_JWT blocks from your ship settings
+4) urls.py:
+   path("api/v1/", include("mobileapi.urls")),
+
+5) requirements: djangorestframework, djangorestframework-simplejwt[crypto], google-auth
+
+6) On server: pip install → migrate → collectstatic → reload (see STABLE_DEPLOY.md)

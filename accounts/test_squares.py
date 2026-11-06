@@ -1,6 +1,7 @@
 import random
 from collections import Counter
 from datetime import date
+from unittest.mock import patch
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -24,14 +25,14 @@ class SquaresRulesTests(SimpleTestCase):
         self.assertEqual(sorted(counts.values()), [33, 33, 34])
 
     def test_split_is_always_within_one_square(self):
-        for n in (1, 2, 7, 33, 49, 51, 99, 100):
+        for n in (1, 2, 7, 33, 49, 50):
             counts = Counter(split_squares(range(n), random.Random(n)))
             self.assertEqual(sum(counts.values()), 100)
             self.assertLessEqual(max(counts.values()) - min(counts.values()), 1)
 
-    def test_more_players_than_squares_is_refused(self):
+    def test_more_than_fifty_players_is_refused(self):
         with self.assertRaises(ValueError):
-            split_squares(range(101), random.Random(1))
+            split_squares(range(51), random.Random(1))
 
     def test_digits_are_a_shuffle_of_zero_to_nine(self):
         self.assertEqual(sorted(draw_digits(random.Random(3))), list('0123456789'))
@@ -62,6 +63,24 @@ class SquaresBoardTests(TestCase):
         self.assertEqual(owners, {'sb0', 'sb1', 'sb2'})
         self.assertEqual(sorted(board.home_digits), list('0123456789'))
         self.assertEqual(sorted(board.away_digits), list('0123456789'))
+
+    def test_more_than_fifty_active_players_only_gets_top_fifty_squares(self):
+        extra_users = [User.objects.create_user(username=f"sb_extra{i}") for i in range(52)]
+        for user in extra_users:
+            PlayoffEntry.objects.create(user=user, season=self.season)
+        ordered_entries = list(PlayoffEntry.objects.filter(
+            season=self.season, status=PlayoffEntry.ACTIVE).order_by("user__username"))
+        expected_ids = {entry.user_id for entry in ordered_entries[:50]}
+
+        with patch("accounts.squares.field_standings",
+                   return_value=[(entry, (0, 0, 0)) for entry in ordered_entries]):
+            board = build_board(self.season, rng=random.Random(7))
+
+        actual_ids = set(board.squares.values_list("owner_id", flat=True))
+        self.assertEqual(len(actual_ids), 50)
+        self.assertEqual(actual_ids, expected_ids)
+        self.assertEqual(PlayoffEntry.objects.filter(
+            season=self.season, status=PlayoffEntry.ACTIVE).count(), 55)
 
     def test_board_cannot_be_redrawn_by_accident(self):
         build_board(self.season, rng=random.Random(1))

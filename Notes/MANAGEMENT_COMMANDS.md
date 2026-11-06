@@ -14,11 +14,15 @@
 ## `accounts` — `manage_playoffs`
 - `status` / `open` / `cut` against current `PlayoffEntry` + `PlayoffSettings`
 - Refuses `open` if field already open; refuses unsafe cuts unless `--force`
+- The normal `/api/sync/` workflow now automatically calls the same `open_playoffs()` and `run_cut()` functions once the complete regular season / playoff round is final.
+- Automatic opening waits for all 18 regular-season weeks to be loaded and final; automatic cuts wait for all 6 Wild Card, 4 Divisional, or 2 Conference games to be loaded and final.
+- Manual commands remain available for staff overrides and status checks.
 - **Keep**
 
 ## `accounts` — `squares`
 - Build board, set Super Bowl game, enter quarter scores
-- Uses current squares models/rules
+- Maximum 50 participants. Everyone active gets in at 50 or fewer; if more are active, the existing playoff survival ranking selects the top 50 for Squares only and does not eliminate anyone from the playoffs.
+- Board dealing remains a deliberate staff command; the board is read-only to players.
 - **Keep**
 
 ## `accounts` — `seed_demo`

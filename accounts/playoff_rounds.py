@@ -41,15 +41,19 @@ def round_week(config, round_no):
     return config.first_playoff_week + round_no - 1
 
 
+@transaction.atomic
 def open_playoffs(season=None, force=False):
     """Freeze the playoff field. Returns the number of entrants."""
     season = season or settings.NFL_SEASON
     config = get_config(season)
+    # Serialize field opening against another sync/administrator invocation.
+    config = PlayoffSettings.objects.select_for_update().get(pk=config.pk)
     if PlayoffEntry.objects.filter(season=season).exists():
         raise PlayoffError(f'The {season} playoff field is already open.')
 
-    # field_size is huge on purpose: the bracket helper caps at 50, but the
-    # playoff field itself is everyone who qualified.
+    # Preserve the compatibility argument, but freeze every player returned
+    # by the existing capacity-based qualification algorithm. The separate
+    # Super Bowl Squares 50-player limit never caps playoff qualification.
     bracket = championship_bracket(season, field_size=10 ** 6)
     if bracket['is_provisional'] and not force:
         raise PlayoffError(
@@ -112,6 +116,8 @@ def run_cut(season=None, force=False):
     """Apply the next weekly cut. Returns a summary dict."""
     season = season or settings.NFL_SEASON
     config = get_config(season)
+    # A row lock prevents overlapping cron runs from applying the same cut twice.
+    config = PlayoffSettings.objects.select_for_update().get(pk=config.pk)
     round_no = config.rounds_cut + 1
     if round_no > CUTS:
         raise PlayoffError('All cuts are done. The Super Bowl field is set.')

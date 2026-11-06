@@ -615,44 +615,89 @@ document.addEventListener('DOMContentLoaded', function () {
 
         <div class="social-section" id="socialSectionLive" data-social-section="live" hidden>
             <div class="section-head" style="margin-bottom:10px">
-                <h3 style="margin:0">🔴 Live energy</h3>
+                <h3 style="margin:0">🔴 Live chat</h3>
                 <a href="{% url 'picks' %}?season={{ selected_season }}&amp;week={{ mission_week }}">View games</a>
             </div>
             {% if live_moments and live_moments.live_games %}
-            <ul class="live-game-list" id="socialLiveGameList">
-                {% for g in live_moments.live_games %}
-                <li class="live-game-row" data-live-game>
-                    <button type="button" class="live-game-toggle" aria-expanded="false">
-                        <span class="pill pill-live">{{ g.status|upper }}</span>
-                        <strong>{{ g.away_team }} {% if g.away_score is not None %}{{ g.away_score }}{% endif %} @ {{ g.home_team }} {% if g.home_score is not None %}{{ g.home_score }}{% endif %}</strong>
-                    </button>
-                    <form method="post" action="{% url 'react_to_game' g.game_id %}" class="live-react-form" hidden>
-                        {% csrf_token %}
-                        <input type="hidden" name="next" value="{% url 'dashboard' %}">
-                        <button type="submit" name="emoji" value="🔥" class="reaction-btn" title="Fire">🔥</button>
-                        <button type="submit" name="emoji" value="😱" class="reaction-btn" title="Shock">😱</button>
-                        <button type="submit" name="emoji" value="💪" class="reaction-btn" title="Clutch">💪</button>
-                        <button type="submit" name="emoji" value="🎉" class="reaction-btn" title="Party">🎉</button>
-                        <button type="submit" name="emoji" value="💔" class="reaction-btn" title="Heartbreak">💔</button>
+            <div class="gchat" id="gameChat"
+                 data-poll-url="{% url 'chat_poll' game_id='__GAME__' %}"
+                 data-send-url="{% url 'chat_send' game_id='__GAME__' %}"
+                 data-start-url="{% url 'chat_start' game_id='__GAME__' %}"
+                 data-csrf="{{ csrf_token }}"
+                 data-me="{{ request.user.username }}"
+                 data-initial-game="{{ request.GET.chat|default:'' }}">
+                <ul class="live-game-list gchat-games" id="socialLiveGameList" aria-label="Pick a game to chat about">
+                    {% for g in live_moments.live_games %}
+                    <li class="live-game-row" data-live-game data-game-id="{{ g.game_id }}">
+                        <button type="button" class="live-game-toggle" aria-pressed="false">
+                            <span class="pill pill-live">{{ g.status|upper }}</span>
+                            <strong data-game-line>{{ g.away_team }} {% if g.away_score is not None %}{{ g.away_score }}{% endif %} @ {{ g.home_team }} {% if g.home_score is not None %}{{ g.home_score }}{% endif %}</strong>
+                            <span class="gchat-live-badge" hidden>💬 Chat live</span>
+                        </button>
+                        <noscript>
+                            <form method="post" action="{% url 'react_to_game' g.game_id %}" class="live-react-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{% url 'dashboard' %}">
+                                <button type="submit" name="emoji" value="🔥" class="reaction-btn" title="Fire">🔥</button>
+                                <button type="submit" name="emoji" value="😱" class="reaction-btn" title="Shock">😱</button>
+                                <button type="submit" name="emoji" value="💪" class="reaction-btn" title="Clutch">💪</button>
+                                <button type="submit" name="emoji" value="🎉" class="reaction-btn" title="Party">🎉</button>
+                                <button type="submit" name="emoji" value="💔" class="reaction-btn" title="Heartbreak">💔</button>
+                            </form>
+                        </noscript>
+                    </li>
+                    {% endfor %}
+                </ul>
+
+                <section class="gchat-panel" id="gchatPanel" aria-label="Game chat" hidden>
+                    <div class="gchat-head">
+                        <strong id="gchatTitle">Game chat</strong>
+                        <span class="pill" id="gchatState">Quiet</span>
+                    </div>
+                    <div class="gchat-log" id="gchatLog" role="log" aria-live="polite" aria-relevant="additions"></div>
+                    <div class="gchat-start" id="gchatStart" hidden>
+                        <p>Nobody is talking yet. Start the chat and the whole site will know it's live.</p>
+                        <button type="button" class="btn btn-red btn-sm" id="gchatStartBtn">💬 Start chat</button>
+                    </div>
+                    <div class="gchat-emotes" id="gchatEmotes" role="group" aria-label="Quick reactions">
+                        <button type="button" class="reaction-btn" data-emoji="🔥" title="Fire" aria-label="React Fire">🔥</button>
+                        <button type="button" class="reaction-btn" data-emoji="😱" title="Shock" aria-label="React Shock">😱</button>
+                        <button type="button" class="reaction-btn" data-emoji="💪" title="Clutch" aria-label="React Clutch">💪</button>
+                        <button type="button" class="reaction-btn" data-emoji="🎉" title="Party" aria-label="React Party">🎉</button>
+                        <button type="button" class="reaction-btn" data-emoji="💔" title="Heartbreak" aria-label="React Heartbreak">💔</button>
+                    </div>
+                    <form class="gchat-form" id="gchatForm" autocomplete="off">
+                        <div class="gchat-target" id="gchatTarget" hidden>
+                            <span>To <strong id="gchatTargetName"></strong>:</span>
+                            <button type="button" id="gchatTargetClear" aria-label="Stop whispering">&times;</button>
+                        </div>
+                        <div class="gchat-input-row">
+                            <input type="text" id="gchatInput" maxlength="240" enterkeyhint="send"
+                                   placeholder="Say something…  (/w friend, /me, /help)"
+                                   aria-label="Chat message">
+                            <button type="submit" class="gchat-send" id="gchatSend">Send</button>
+                        </div>
                     </form>
-                </li>
-                {% endfor %}
-            </ul>
+                </section>
+            </div>
             {% else %}
-            <p class="friends-empty-message">No live games right now. Check back during kickoff windows.</p>
+            <p class="friends-empty-message">No live games right now. Chat opens at kickoff.</p>
             {% endif %}
             {% if live_moments and live_moments.reactions %}
-            <ul class="activity-list" style="margin-top:10px">
-                {% for r in live_moments.reactions %}
-                <li class="activity-item">
-                    <span class="activity-icon">{{ r.emoji }}</span>
-                    <div class="activity-body">
-                        <p><strong>{{ r.user.username }}</strong> on {{ r.game.away_team }} @ {{ r.game.home_team }}</p>
-                        <p class="detail">{{ r.created_at|timesince }} ago</p>
-                    </div>
-                </li>
-                {% endfor %}
-            </ul>
+            <details class="gchat-reactions">
+                <summary>Recent reactions</summary>
+                <ul class="activity-list" style="margin-top:10px">
+                    {% for r in live_moments.reactions %}
+                    <li class="activity-item">
+                        <span class="activity-icon">{{ r.emoji }}</span>
+                        <div class="activity-body">
+                            <p><strong>{{ r.user.username }}</strong> on {{ r.game.away_team }} @ {{ r.game.home_team }}</p>
+                            <p class="detail">{{ r.created_at|timesince }} ago</p>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </details>
             {% endif %}
         </div><!-- /#socialSectionLive -->
 
@@ -700,7 +745,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 Friends
             </button>
             <button type="button" class="social-nav-btn" id="socialNavLive" role="tab" aria-selected="false" aria-controls="socialSectionLive" data-social-nav="live">
-                Live energy
+                Live chat
             </button>
             <button type="button" class="social-nav-btn" id="socialNavMoments" role="tab" aria-selected="false" aria-controls="socialSectionMoments" data-social-nav="moments">
                 Moments
@@ -712,6 +757,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 {% include 'main/_player_menu.html' %}
 <script src="{% static 'js/leaderboard.js' %}"></script>
+<script src="{% static 'js/livechat.js' %}"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -834,28 +880,18 @@ document.addEventListener('DOMContentLoaded', function () {
         if (button) button.addEventListener('click', () => activateSocialSection(section));
     });
 
-    // Live energy accordion: one game's emotes open at a time
-    const liveGameList = document.getElementById('socialLiveGameList');
-    if (liveGameList) {
-        liveGameList.querySelectorAll('[data-live-game]').forEach(function (row) {
-            const toggleBtn = row.querySelector('.live-game-toggle');
-            const form = row.querySelector('.live-react-form');
-            if (!toggleBtn || !form) return;
-            toggleBtn.addEventListener('click', function () {
-                const opening = !row.classList.contains('is-open');
-                liveGameList.querySelectorAll('[data-live-game].is-open').forEach(function (openRow) {
-                    if (openRow === row) return;
-                    openRow.classList.remove('is-open');
-                    const openForm = openRow.querySelector('.live-react-form');
-                    const openToggle = openRow.querySelector('.live-game-toggle');
-                    if (openForm) openForm.hidden = true;
-                    if (openToggle) openToggle.setAttribute('aria-expanded', 'false');
-                });
-                row.classList.toggle('is-open', opening);
-                form.hidden = !opening;
-                toggleBtn.setAttribute('aria-expanded', String(opening));
-            });
-        });
+    // Live chat (static/js/livechat.js) drives the game windows and polling.
+    // A "chat is live" announcement, or ?chat=<game id>, opens the drawer on it.
+    function openLiveChat(gameId) {
+        activateSocialSection('live');
+        openDrawer();
+        if (window.GDPChat) window.GDPChat.open(gameId);
+    }
+    document.addEventListener('gdp:open-chat', function (event) {
+        openLiveChat(event.detail && event.detail.gameId);
+    });
+    if (params.get('chat')) {
+        openLiveChat(params.get('chat'));
     }
 
     // Alerts: open Social drawer on Requests tab

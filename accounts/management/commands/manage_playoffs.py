@@ -20,7 +20,7 @@ from accounts.playoff_rounds import (
 
 
 class Command(BaseCommand):
-    help = 'Open the playoff field, apply weekly cuts, or show the current status.'
+    help = 'Open the playoff field, apply weekly cuts, or show the current status. The sync service also performs opening and cuts automatically when ready.'
 
     def add_arguments(self, parser):
         parser.add_argument('action', choices=['status', 'open', 'cut'])

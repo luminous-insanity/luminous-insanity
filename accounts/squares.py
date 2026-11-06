@@ -14,9 +14,9 @@ from django.db import transaction
 
 from api.models import Game, QuarterScore
 
-from .models import BoardSquare, PlayoffEntry, SquaresBoard
-from .playoff_rounds import CUTS, PlayoffError, get_config, round_week
-from .squares_rules import BOARD_SIZE, draw_digits, split_squares, winning_cell
+from .models import BoardSquare, SquaresBoard
+from .playoff_rounds import CUTS, PlayoffError, field_standings, get_config, round_week
+from .squares_rules import BOARD_SIZE, MAX_SQUARES_PLAYERS, draw_digits, split_squares, winning_cell
 
 QUARTER_LABELS = {1: 'End of Q1', 2: 'Halftime', 3: 'End of Q3', 4: 'Final'}
 
@@ -29,9 +29,11 @@ def find_super_bowl_game(season, config=None):
 
 @transaction.atomic
 def build_board(season=None, rebuild=False, force=False, rng=None):
-    """Deal the squares to the active playoff players, then draw the digits.
+    """Deal squares to up to MAX_SQUARES_PLAYERS active playoff players.
 
-    Only the players left after the final cut get squares. The digits are
+    Everyone active gets in when there are 50 or fewer. If more are active,
+    the existing playoff survival ranking selects the top 50 for Squares only;
+    no playoff entries are eliminated by this choice. The digits are
     drawn after the deal and then stored, so they can't be re-rolled by
     accident: an existing board is refused unless rebuild=True.
     """
@@ -48,8 +50,13 @@ def build_board(season=None, rebuild=False, force=False, rng=None):
             f'The {season} board already exists. Use --rebuild to redraw it '
             f'(this changes everyone\'s squares).')
 
-    player_ids = list(PlayoffEntry.objects.filter(
-        season=season, status=PlayoffEntry.ACTIVE).values_list('user_id', flat=True))
+    # Super Bowl Squares is a separate, 50-person maximum competition. The
+    # playoff field itself is never capped here. If 50 or fewer players remain,
+    # everyone gets in; if more remain (for example after a staff --force),
+    # use the existing playoff survival ranking to select the top 50 without
+    # changing anyone's playoff status.
+    ranked_active = field_standings(season)
+    player_ids = [entry.user_id for entry, _record in ranked_active[:MAX_SQUARES_PLAYERS]]
     if not player_ids:
         raise PlayoffError('There are no active playoff players to give squares to.')
     try:

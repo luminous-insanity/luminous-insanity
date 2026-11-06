@@ -21,6 +21,7 @@ from .views import (
     react_to_game,
     week_recap,
 )
+from .chat_views import chat_status, chat_poll, chat_start, chat_send
 from .share_views import share_perfect_week, share_challenge, my_share_links
 from .challenge_views import (
     challenges,
@@ -67,5 +68,9 @@ urlpatterns = [
     path('share/', my_share_links, name='share_hub'),
     path('titles/equip/', equip_title_view, name='equip_title'),
     path('react/game/<str:game_id>/', react_to_game, name='react_to_game'),
+    path('chat/status/', chat_status, name='chat_status'),
+    path('chat/<str:game_id>/poll/', chat_poll, name='chat_poll'),
+    path('chat/<str:game_id>/start/', chat_start, name='chat_start'),
+    path('chat/<str:game_id>/send/', chat_send, name='chat_send'),
     path('recap/', week_recap, name='week_recap'),
 ]

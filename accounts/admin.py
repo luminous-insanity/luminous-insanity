@@ -67,3 +67,30 @@ class CrossfireAdmin(admin.ModelAdmin):
     list_filter = ('season', 'week')
     search_fields = ('attacker__username', 'target__username', 'game__game_id')
     raw_id_fields = ('attacker', 'target', 'game')
+
+
+from .models import LiveChatMessage, LiveChatRoom
+
+
+@admin.register(LiveChatRoom)
+class LiveChatRoomAdmin(admin.ModelAdmin):
+    list_display = ('game', 'started_by', 'went_live_at', 'last_message_at')
+    raw_id_fields = ('game', 'started_by')
+
+
+@admin.register(LiveChatMessage)
+class LiveChatMessageAdmin(admin.ModelAdmin):
+    """Read/hide only for now; hiding removes a line from every player's chat."""
+    list_display = ('created_at', 'room', 'author', 'kind', 'recipient', 'body', 'is_hidden')
+    list_filter = ('kind', 'is_hidden')
+    search_fields = ('author__username', 'recipient__username', 'body')
+    raw_id_fields = ('room', 'author', 'recipient')
+    actions = ('hide_selected', 'unhide_selected')
+
+    @admin.action(description='Hide selected messages')
+    def hide_selected(self, request, queryset):
+        queryset.update(is_hidden=True)
+
+    @admin.action(description='Unhide selected messages')
+    def unhide_selected(self, request, queryset):
+        queryset.update(is_hidden=False)

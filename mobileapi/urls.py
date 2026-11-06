@@ -1,0 +1,40 @@
+from django.urls import path
+from . import auth, games, social, features, competitions, relay, pages
+
+app_name = 'mobileapi'
+
+urlpatterns = [
+    path('auth/register/', auth.RegisterView.as_view(), name='register'),
+    path('auth/login/', auth.LoginView.as_view(), name='login'),
+    path('auth/google/', auth.GoogleLoginView.as_view(), name='google'),
+    path('auth/refresh/', auth.TokenRefreshView.as_view(), name='refresh'),
+    path('auth/logout/', auth.LogoutView.as_view(), name='logout'),
+    path('me/', auth.MeView.as_view(), name='me'),
+    path('games/', games.GamesView.as_view(), name='games'),
+    path('picks/', games.PicksView.as_view(), name='picks'),
+    path('leaderboard/', games.LeaderboardView.as_view(), name='leaderboard'),
+    path('friends/', social.FriendsView.as_view(), name='friends'),
+    path('friends/search/', social.FriendSearchView.as_view(), name='friend-search'),
+    path('friends/requests/', social.FriendRequestView.as_view(), name='friend-request'),
+    path('friends/requests/<int:request_id>/respond/', social.FriendRespondView.as_view(), name='friend-respond'),
+    path('notifications/', social.NotificationsView.as_view(), name='notifications'),
+    path('chat/status/', social.ChatStatusView.as_view(), name='chat-status'),
+    path('chat/games/<str:game_id>/', social.ChatGameView.as_view(), name='chat-game'),
+    path('devices/', social.DeviceRegistrationView.as_view(), name='devices'),
+    path('games/<str:game_id>/reactions/', social.GameReactionView.as_view(), name='game-reactions'),
+    path('reactions/performance/', social.PerformanceReactionView.as_view(), name='performance-reactions'),
+    path('features/summary/', features.PlayerFeatureSummaryView.as_view(), name='feature-summary'),
+    path('challenges/', competitions.ChallengesView.as_view(), name='challenges'),
+    path('challenges/<int:challenge_id>/respond/', competitions.ChallengeRespondView.as_view(), name='challenge-respond'),
+    path('crossfire/', competitions.CrossfireView.as_view(), name='crossfire'),
+    path('crossfire/<int:crossfire_id>/', competitions.CrossfireCancelView.as_view(), name='crossfire-cancel'),
+    path('relaywars/', relay.RelayWarsView.as_view(), name='relaywars'),
+    path('relaywars/matches/<int:match_id>/', relay.RelayMatchView.as_view(), name='relaywars-match'),
+    path('history/', pages.HistoryView.as_view(), name='history'),
+    path('players/<int:user_id>/', pages.PlayerProfileView.as_view(), name='player-profile'),
+    path('players/<int:user_id>/compare/', pages.ComparePicksView.as_view(), name='compare-picks'),
+    path('divisions/', pages.DivisionView.as_view(), name='divisions'),
+    path('playoffs/', pages.PlayoffsView.as_view(), name='playoffs'),
+    path('squares/', pages.SquaresView.as_view(), name='squares'),
+    path('live-moments/', pages.LiveMomentsView.as_view(), name='live-moments'),
+]
