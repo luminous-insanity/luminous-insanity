@@ -2,12 +2,13 @@
 
 All derived from existing picks, games, and reactions — no parallel scoring system.
 """
+import logging
 from collections import defaultdict
+from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import Count, Q
-from datetime import timedelta
 from django.utils import timezone
 
 from api.models import Game
@@ -15,6 +16,8 @@ from api.rules import grade_pick
 from api.services import get_team_records, current_week
 from .models import Pick, GameReaction
 from .confidence import is_underdog_pick, confidence_points_for_user
+
+log = logging.getLogger(__name__)
 
 
 def _pct(rec):
@@ -149,14 +152,19 @@ def confidence_board(season=None, week=None, users=None, limit=25):
 
     rows = []
     for user in users:
-        stats = confidence_points_for_user(user, season=season, week=week, team_records=team_records)
-        if stats['points'] or stats['underdog_locks']:
-            rows.append({
-                'user': user,
-                'points': stats['points'],
-                'underdog_locks': stats['underdog_locks'],
-            })
-    rows.sort(key=lambda r: (-r['points'], -r['underdog_locks'], r['user'].username.lower()))
+        try:
+            stats = confidence_points_for_user(user, season=season, week=week, team_records=team_records)
+            if stats.get('points') or stats.get('underdog_locks'):
+                rows.append({
+                    'user': user,
+                    'points': stats.get('points', 0),
+                    'underdog_locks': stats.get('underdog_locks', 0),
+                })
+        except Exception:
+            # One bad user/pick must not take down the whole confidence leaderboard
+            log.exception("Confidence calc failed for user %s", getattr(user, 'pk', None))
+            continue
+    rows.sort(key=lambda r: (-r['points'], -r['underdog_locks'], (r['user'].username or '').lower()))
     for i, row in enumerate(rows[:limit], start=1):
         row['rank'] = i
     return rows[:limit]

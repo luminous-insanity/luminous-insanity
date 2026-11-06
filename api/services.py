@@ -21,7 +21,7 @@ from datetime import timedelta
 
 import requests
 from django.conf import settings
-from django.db.models import Max, Q
+from django.db.models import Count, Max, Q
 from django.utils import timezone
 
 from . import rules
@@ -31,8 +31,11 @@ from django.core.cache import cache
 log = logging.getLogger(__name__)
 
 REGULAR_SEASON_MAX_WEEK = 18
+REGULAR_SEASON_GAMES_PER_WEEK = 16
 FIRST_PLAYOFF_WEEK = 19
 PLAYOFF_ROUNDS = 4
+# NFL postseason games per elimination round: Wild Card, Divisional, Conference.
+PLAYOFF_GAMES_PER_CUT = {1: 6, 2: 4, 3: 2}
 MAX_WEEK = FIRST_PLAYOFF_WEEK + PLAYOFF_ROUNDS - 1  # 22
 REQUEST_TIMEOUT = 15     # seconds; never let a hung request freeze the site
 LIVE_RECHECK = timedelta(minutes=15)  # match free cron-job.org interval; cache live scores this long
@@ -76,14 +79,17 @@ def _week_api_params(week, endpoint):
     }
 
 
-def _get(endpoint, params):
+def _get(endpoint, params, timeout=None):
     url = f"https://{settings.NFL_API_HOST}/{endpoint}"
     headers = {
         "x-rapidapi-key": settings.NFL_API_KEY,
         "x-rapidapi-host": settings.NFL_API_HOST,
     }
     try:
-        response = requests.get(url, headers=headers, params=params, timeout=REQUEST_TIMEOUT)
+        response = requests.get(
+            url, headers=headers, params=params,
+            timeout=timeout or REQUEST_TIMEOUT,
+        )
         response.raise_for_status()
         data = response.json()
     except (requests.RequestException, ValueError) as exc:
@@ -94,40 +100,48 @@ def _get(endpoint, params):
     return body
 
 
-def get_team_records():
-    """Fetch NFL team records and cache them for 24 hours."""
+TEAM_RECORDS_FAIL_TTL = 300      # seconds to remember a failed lookup
+TEAM_RECORDS_TIMEOUT = 4         # seconds; this runs while a page is rendering
 
+
+def get_team_records():
+    """Fetch NFL team records, cached 24h. Never blocks page loads for long.
+
+    A failed or empty lookup is cached for a few minutes so a slow or
+    rate-limited API cannot make every page view wait on it (504s).
+    Always returns a dict (empty when records are unavailable).
+    """
     cache_key = "nfl_team_records"
     cached_records = cache.get(cache_key)
-
     if cached_records is not None:
         return cached_records
 
-    teams = _get("getNFLTeams", {})
-
-    if not isinstance(teams, list):
-        raise ApiError("getNFLTeams returned an unexpected response.")
+    try:
+        teams = _get("getNFLTeams", {}, timeout=TEAM_RECORDS_TIMEOUT)
+        if not isinstance(teams, list):
+            raise ApiError("getNFLTeams returned an unexpected response.")
+    except ApiError as exc:
+        log.warning(
+            "Team records unavailable, using none for %ss: %s",
+            TEAM_RECORDS_FAIL_TTL, exc,
+        )
+        cache.set(cache_key, {}, TEAM_RECORDS_FAIL_TTL)
+        return {}
 
     records = {}
-
     for team in teams:
         if not isinstance(team, dict):
             continue
-
         team_abbr = team.get("teamAbv")
-
         if not team_abbr:
             continue
-
         records[team_abbr] = {
             "wins": team.get("wins", 0),
             "losses": team.get("loss", 0),
             "ties": team.get("tie", 0),
         }
 
-    if records:
-        cache.set(cache_key, records, 86400)
-
+    cache.set(cache_key, records, 86400 if records else TEAM_RECORDS_FAIL_TTL)
     return records
 
 
@@ -234,6 +248,87 @@ def current_week():
     return rules.choose_current_week(rows, timezone.localdate())
 
 
+
+def _regular_season_ready_for_playoffs(season):
+    """Require all 18 regular-season weeks and every game to be final.
+
+    Qualification rules remain owned by accounts.playoffs / the existing
+    capacity algorithm. This is an additional automation safety gate so a
+    partially loaded season cannot be mistaken for a completed season.
+    """
+    regular = Game.objects.filter(
+        season=season, week__gte=1, week__lte=REGULAR_SEASON_MAX_WEEK,
+    )
+    week_counts = dict(
+        regular.values_list("week").annotate(game_count=Count("id"))
+    )
+    if any(
+        week_counts.get(week) != REGULAR_SEASON_GAMES_PER_WEEK
+        for week in range(1, REGULAR_SEASON_MAX_WEEK + 1)
+    ):
+        return False
+    return not regular.exclude(
+        status=Game.FINAL, home_score__isnull=False, away_score__isnull=False,
+    ).exists()
+
+
+def _process_playoff_lifecycle(report):
+    """Automatically freeze the field and apply completed-round cuts.
+
+    This calls the same open_playoffs() and run_cut() functions used by the
+    staff management command. It does not implement or alter qualification,
+    ranking, cut targets, or tiebreak rules.
+    """
+    from accounts.models import PlayoffEntry
+    from accounts.playoff_rounds import (
+        CUTS, PlayoffError, get_config, open_playoffs, run_cut,
+    )
+
+    season = settings.NFL_SEASON
+    report.setdefault("playoff_actions", [])
+
+    if not PlayoffEntry.objects.filter(season=season).exists():
+        if not _regular_season_ready_for_playoffs(season):
+            return
+        try:
+            entrants = open_playoffs(season)
+        except PlayoffError as exc:
+            # Not ready / no qualified players is a normal state during sync.
+            log.info("Automatic playoff opening deferred for %s: %s", season, exc)
+            return
+        report["playoff_actions"].append({
+            "action": "opened", "season": season, "entrants": entrants,
+        })
+
+    config = get_config(season)
+    while config.rounds_cut < CUTS:
+        round_no = config.rounds_cut + 1
+        week = config.first_playoff_week + round_no - 1
+        round_games = Game.objects.filter(season=season, week=week)
+
+        # Require the complete NFL round schedule, not merely all currently
+        # loaded games to be final (which could cut early on a partial feed).
+        expected = PLAYOFF_GAMES_PER_CUT.get(round_no)
+        if expected is None or round_games.count() != expected:
+            break
+        if round_games.exclude(
+            status=Game.FINAL, home_score__isnull=False, away_score__isnull=False,
+        ).exists():
+            break
+
+        try:
+            result = run_cut(season)
+        except PlayoffError as exc:
+            log.info("Automatic playoff cut %s deferred for %s: %s", round_no, season, exc)
+            break
+        report["playoff_actions"].append({
+            "action": "cut", "season": season, "round": result["round"],
+            "round_name": result["round_name"], "before": result["before"],
+            "after": result["after"], "eliminated": result["cut"],
+        })
+        config.refresh_from_db(fields=["rounds_cut", "first_playoff_week"])
+
+
 # ---------------------------------------------------------------- run_sync --
 
 def run_sync():
@@ -241,7 +336,10 @@ def run_sync():
     Everything the site needs, in a few small steps. Safe to call any time,
     any number of times. Returns a dict describing what happened.
     """
-    report = {"schedule_weeks": [], "score_weeks": [], "final_games": 0, "errors": []}
+    report = {
+        "schedule_weeks": [], "score_weeks": [], "final_games": 0,
+        "errors": [], "playoff_actions": [],
+    }
 
     def attempt(label, func, *args):
         try:
@@ -286,6 +384,10 @@ def run_sync():
         if this_week.exists() and stale.exists():
             if attempt(f"schedule week {week}", sync_schedule, week) is not None:
                 report["schedule_weeks"].append(week)
+
+    # 5. Freeze the existing qualification result and process any fully
+    # completed playoff rounds. Safe to retry on every scheduled sync.
+    _process_playoff_lifecycle(report)
 
     report["current_week"] = current_week()
     return report
