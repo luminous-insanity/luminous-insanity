@@ -52,7 +52,7 @@ def home(request):
 
 
 def _remembered_filter(request, tab):
-    """All Players / Friends, remembered separately for each tab (in the session)."""
+    """Everyone / Friends / Division, remembered separately for each top tab."""
     key = f'lb_filter_{tab}'
     chosen = request.GET.get('filter')
     if chosen in lb.FILTERS:
@@ -60,6 +60,35 @@ def _remembered_filter(request, tab):
         return chosen
     saved = request.session.get(key, lb.FILTER_ALL)
     return saved if saved in lb.FILTERS else lb.FILTER_ALL
+
+
+def _resolve_division(request, selected_season):
+    """Pick a valid division, preferring the request param then the user's lock."""
+    identity = None
+    if request.user.is_authenticated:
+        identity = PlayerIdentity.objects.filter(user=request.user).first()
+        if identity and identity.division_season != selected_season:
+            if identity.favorite_team:
+                identity.division = team_division(identity.favorite_team)
+                identity.division_season = selected_season
+            else:
+                identity.division = ''
+                identity.division_season = None
+            identity.save(update_fields=['division', 'division_season', 'updated_at'])
+
+    division = request.GET.get('division', '').strip()
+    if division not in lb.DIVISION_CHOICES:
+        division = (
+            identity.division
+            if identity and identity.division in lb.DIVISION_CHOICES
+            else 'AFC East'
+        )
+    my_division = (
+        identity.division
+        if identity and identity.division_season == selected_season
+        else ''
+    )
+    return division, my_division
 
 
 def _week_from_request(request, season):
@@ -84,29 +113,70 @@ def leaderboard(request):
     selected_season, seasons = _selected_season(request)
 
     tab = request.GET.get('tab')
-    if tab not in ('weekly', 'season', 'confidence', 'division'):
+    # Division used to be a top-level tab; treat legacy ?tab=division as season + division filter.
+    legacy_division_tab = tab == 'division'
+    if legacy_division_tab:
+        tab = 'season'
+    if tab not in ('weekly', 'season', 'confidence'):
         # Old links used ?week=season for the season view and ?week=N for a week.
         tab = 'season' if request.GET.get('week') == 'season' else 'weekly'
 
-    mode = _remembered_filter(request, tab if tab not in ('confidence', 'division') else 'season')
+    mode = _remembered_filter(request, tab)
+    if legacy_division_tab and request.GET.get('filter') not in lb.FILTERS:
+        mode = lb.FILTER_DIVISION
+        request.session[f'lb_filter_{tab}'] = mode
     selected_week, weeks = _week_from_request(request, selected_season)
     weekly = tab == 'weekly'
+    selected_division, my_division = _resolve_division(request, selected_season)
 
-    def _tab_urls(**extra):
-        base = {'season': selected_season}
-        base.update(extra)
-        q = urlencode(base)
-        return {
-            'weekly_url': f"{reverse('leaderboard')}?{urlencode({'tab': 'weekly', 'season': selected_season, 'week': selected_week})}",
-            'season_url': f"{reverse('leaderboard')}?{urlencode({'tab': 'season', 'season': selected_season})}",
-            'confidence_url': f"{reverse('leaderboard')}?{urlencode({'tab': 'confidence', 'season': selected_season})}",
-            'division_url': f"{reverse('leaderboard')}?{urlencode({'tab': 'division', 'season': selected_season, **({k: v for k, v in extra.items() if k == 'division'} or {})})}",
-        }
+    def url(**params):
+        base = {'tab': tab, 'season': selected_season, 'filter': mode}
+        if weekly:
+            base['week'] = selected_week
+        if mode == lb.FILTER_DIVISION:
+            base['division'] = selected_division
+        base.update(params)
+        # Drop None values so optional params stay clean.
+        base = {k: v for k, v in base.items() if v is not None}
+        return f"{reverse('leaderboard')}?{urlencode(base)}"
 
+    index = weeks.index(selected_week) if selected_week in weeks else 0
+    prev_week = weeks[index - 1] if index > 0 else None
+    next_week = weeks[index + 1] if index < len(weeks) - 1 else None
+
+    champion = lb.champion_payload(selected_season)
+    auto_reveal = lb.should_auto_reveal(request.user, selected_season, champion)
+
+    # ---------- Confidence tab (Everyone / Friends only — not division) ----------
     if tab == 'confidence':
         from accounts.live_features import confidence_board as conf_board_fn
-        conf_rows = conf_board_fn(season=selected_season, limit=50)
-        urls = _tab_urls()
+        # Confidence is a global points board; division is a W-L-T people sort only.
+        if mode == lb.FILTER_DIVISION:
+            mode = lb.FILTER_ALL
+        conf_users = None
+        friends_empty = needs_login = False
+        if mode == lb.FILTER_FRIENDS:
+            if not request.user.is_authenticated:
+                needs_login = True
+                conf_users = []
+            else:
+                friends = lb.friend_users(request.user)
+                if not friends:
+                    friends_empty = True
+                    conf_users = []
+                else:
+                    conf_users = [request.user] + list(friends)
+
+        conf_rows = []
+        if conf_users is not None and len(conf_users) == 0:
+            conf_rows = []
+        else:
+            conf_rows = conf_board_fn(
+                season=selected_season,
+                users=conf_users,
+                limit=50,
+            )
+
         return render(request, 'main/leaderboard.html', {
             'tab': 'confidence',
             'filter_mode': mode,
@@ -114,134 +184,90 @@ def leaderboard(request):
             'user_stats': [],
             'selected_week': selected_week,
             'weeks': weeks,
+            'prev_week': prev_week,
+            'next_week': next_week,
             'selected_season': selected_season,
             'seasons': seasons,
             'winners': [],
             'winner_label': '',
-            'friends_empty': False,
-            'needs_login': False,
-            'champion': None,
-            'auto_reveal': False,
+            'friends_empty': friends_empty,
+            'needs_login': needs_login,
+            'division_empty': False,
+            'champion': champion,
+            'auto_reveal': auto_reveal,
+            'season_final': champion is not None,
             'reaction_choices': PerformanceReaction.choices,
-            **urls,
+            'division_choices': lb.DIVISION_CHOICES,
+            'selected_division': selected_division,
+            'my_division': my_division,
+            'member_count': None,
+            'weekly_url': url(tab='weekly', week=selected_week),
+            'season_url': url(tab='season'),
+            'confidence_url': url(tab='confidence', filter=mode),
+            'prev_url': url(week=prev_week) if prev_week else '',
+            'next_url': url(week=next_week) if next_week else '',
+            'all_url': url(filter=lb.FILTER_ALL),
+            'friends_url': url(filter=lb.FILTER_FRIENDS),
+            'division_filter_url': url(tab='season', filter=lb.FILTER_DIVISION, division=selected_division),
         })
 
-    if tab == 'division':
-        identity = None
-        if request.user.is_authenticated:
-            identity = PlayerIdentity.objects.filter(user=request.user).first()
-            if identity and identity.division_season != selected_season:
-                if identity.favorite_team:
-                    identity.division = team_division(identity.favorite_team)
-                    identity.division_season = selected_season
-                else:
-                    identity.division = ''
-                    identity.division_season = None
-                identity.save(update_fields=['division', 'division_season', 'updated_at'])
-
-        division = request.GET.get('division', '').strip()
-        if division not in DIVISION_CHOICES:
-            division = (
-                identity.division
-                if identity and identity.division in DIVISION_CHOICES
-                else 'AFC East'
-            )
-
-        member_ids = PlayerIdentity.objects.filter(
-            division=division, division_season=selected_season, user__is_superuser=False
-        ).values_list('user_id', flat=True)
-        members = list(User.objects.filter(id__in=member_ids).order_by('username'))
-        playoff_race = division_playoff_race(division, selected_season)
-        standings = playoff_race['standings']
-
-        menus = menu_data(
-            [row.user for row in standings], request.user, selected_season,
-            compare_week=lb.default_week(selected_season),
-            show_week=False,
-        )
-        for row in standings:
-            row.menu = menus.get(row.user.id)
-            row.is_me = bool(row.menu and row.menu.get('is_me'))
-
-        urls = _tab_urls(division=division)
-        # Keep division in the Division tab URL when switching back to this tab.
-        urls['division_url'] = (
-            f"{reverse('leaderboard')}?"
-            f"{urlencode({'tab': 'division', 'season': selected_season, 'division': division})}"
-        )
-        return render(request, 'main/leaderboard.html', {
-            'tab': 'division',
-            'filter_mode': mode,
-            'user_stats': standings,
-            'confidence_rows': [],
-            'selected_week': selected_week,
-            'weeks': weeks,
-            'selected_season': selected_season,
-            'seasons': seasons,
-            'winners': [],
-            'winner_label': '',
-            'friends_empty': False,
-            'needs_login': False,
-            'champion': None,
-            'auto_reveal': False,
-            'reaction_choices': PerformanceReaction.choices,
-            'division_choices': DIVISION_CHOICES,
-            'selected_division': division,
-            'playoff_race': playoff_race,
-            'member_count': len(members),
-            'my_division': (
-                identity.division
-                if identity and identity.division_season == selected_season
-                else ''
-            ),
-            **urls,
-        })
-
+    # ---------- Weekly / Season (with Everyone | Friends | Division) ----------
     board = lb.build_board(
-        tab=tab, season=selected_season,
+        tab=tab,
+        season=selected_season,
         week=selected_week if weekly else None,
-        mode=mode, viewer=request.user,
+        mode=mode,
+        viewer=request.user,
+        division=selected_division if mode == lb.FILTER_DIVISION else None,
     )
     rows = board['rows']
 
-    # What each row's player menu needs (extra stats live there, not in the list).
+    # Playoff-race annotations only on season + division (season-long race).
+    playoff_race = None
+    if not weekly and mode == lb.FILTER_DIVISION and selected_division:
+        playoff_race = division_playoff_race(selected_division, selected_season)
+        # Prefer annotated standings when available so cutoff markers appear.
+        if playoff_race and playoff_race.get('standings'):
+            # Keep only users already in our filtered board order by rank.
+            by_id = {r.user.id: r for r in playoff_race['standings']}
+            annotated = []
+            for row in rows:
+                alt = by_id.get(row.user.id)
+                if alt is not None:
+                    # Preserve menu-related attributes we'll attach below.
+                    annotated.append(alt)
+                else:
+                    annotated.append(row)
+            rows = annotated
+
     menus = menu_data(
         [row.user for row in rows], request.user, selected_season,
         compare_week=selected_week if weekly else lb.default_week(selected_season),
         show_week=weekly,
     )
     for row in rows:
-        row.menu = menus[row.user.id]
-        row.is_me = row.menu['is_me']
+        menu = menus.get(row.user.id) or {}
+        row.menu = menu
+        row.is_me = bool(menu.get('is_me'))
         row.can_react = request.user.is_authenticated and row.user.id != request.user.id
         row.reaction_url = reverse('react_to_performance', args=[row.user.id])
         row.my_reaction = PerformanceReaction.objects.filter(
             reactor=request.user, player=row.user, season=selected_season,
             week=selected_week
         ).first() if row.can_react else None
-        row.reaction_counts = {item['emoji']: item['total'] for item in PerformanceReaction.objects.filter(
-            player=row.user, season=selected_season, week=selected_week
-        ).values('emoji').annotate(total=Count('id'))}
+        row.reaction_counts = {
+            item['emoji']: item['total']
+            for item in PerformanceReaction.objects.filter(
+                player=row.user, season=selected_season, week=selected_week
+            ).values('emoji').annotate(total=Count('id'))
+        }
         row.reaction_clap = row.reaction_counts.get('👏', 0)
         row.reaction_fire = row.reaction_counts.get('🔥', 0)
         row.reaction_crown = row.reaction_counts.get('👑', 0)
 
-    def url(**params):
-        base = {'tab': tab, 'season': selected_season}
-        if weekly:
-            base['week'] = selected_week
-        base.update(params)
-        return f"{reverse('leaderboard')}?{urlencode(base)}"
-
-    index = weeks.index(selected_week)
-    prev_week = weeks[index - 1] if index > 0 else None
-    next_week = weeks[index + 1] if index < len(weeks) - 1 else None
-
-    champion = lb.champion_payload(selected_season)
-    auto_reveal = lb.should_auto_reveal(request.user, selected_season, champion)
-
     winners = board['winners']
     week_done = weekly and lb.week_is_complete(selected_season, selected_week)
+    member_count = len(rows) if mode == lb.FILTER_DIVISION else None
 
     return render(
         request,
@@ -250,6 +276,7 @@ def leaderboard(request):
             'tab': tab,
             'filter_mode': mode,
             'user_stats': rows,
+            'confidence_rows': [],
             'reaction_choices': PerformanceReaction.choices,
             'selected_week': selected_week,
             'weeks': weeks,
@@ -261,17 +288,23 @@ def leaderboard(request):
             'winner_label': 'WINNER' if week_done else 'LEADER',
             'friends_empty': board['friends_empty'],
             'needs_login': board['needs_login'],
+            'division_empty': board.get('division_empty', False),
             'champion': champion,
             'auto_reveal': auto_reveal,
             'season_final': champion is not None,
+            'division_choices': lb.DIVISION_CHOICES,
+            'selected_division': selected_division,
+            'my_division': my_division,
+            'playoff_race': playoff_race,
+            'member_count': member_count,
             'weekly_url': url(tab='weekly', week=selected_week),
             'season_url': url(tab='season'),
             'confidence_url': url(tab='confidence'),
-            'division_url': f"{reverse('leaderboard')}?{urlencode({'tab': 'division', 'season': selected_season})}",
             'prev_url': url(week=prev_week) if prev_week else '',
             'next_url': url(week=next_week) if next_week else '',
             'all_url': url(filter=lb.FILTER_ALL),
             'friends_url': url(filter=lb.FILTER_FRIENDS),
+            'division_filter_url': url(filter=lb.FILTER_DIVISION, division=selected_division),
         }
     )
 

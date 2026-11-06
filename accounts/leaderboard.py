@@ -22,7 +22,13 @@ from .standings import compute_standings, standing_for
 
 FILTER_ALL = "all"
 FILTER_FRIENDS = "friends"
-FILTERS = (FILTER_ALL, FILTER_FRIENDS)
+FILTER_DIVISION = "division"
+FILTERS = (FILTER_ALL, FILTER_FRIENDS, FILTER_DIVISION)
+
+DIVISION_CHOICES = (
+    'AFC East', 'AFC North', 'AFC South', 'AFC West',
+    'NFC East', 'NFC North', 'NFC South', 'NFC West',
+)
 
 
 def inactive_days():
@@ -180,7 +186,21 @@ def winners_of(rows):
     return []
 
 
-def build_board(*, tab, season, week, mode, viewer):
+def division_member_ids(division, season):
+    """User ids locked into this division for the given season."""
+    from .models import PlayerIdentity
+    if not division or division not in DIVISION_CHOICES:
+        return set()
+    return set(
+        PlayerIdentity.objects.filter(
+            division=division,
+            division_season=season,
+            user__is_superuser=False,
+        ).values_list('user_id', flat=True)
+    )
+
+
+def build_board(*, tab, season, week, mode, viewer, division=None):
     """
     Returns a dict:
       rows          ranked Standings (with .pending and, on Weekly, movement)
@@ -188,11 +208,12 @@ def build_board(*, tab, season, week, mode, viewer):
       winners       players tied for first (Weekly banner)
       friends_empty True when Friends is chosen but there are no friends yet
       needs_login   True when Friends is chosen by a visitor who isn't logged in
+      division_empty True when Division is chosen but no members exist yet
     """
     weekly = tab == "weekly"
     users = eligible_users(season, week if weekly else None)
 
-    friends_empty = needs_login = False
+    friends_empty = needs_login = division_empty = False
     if mode == FILTER_FRIENDS:
         if viewer is None or not viewer.is_authenticated:
             needs_login = True
@@ -206,6 +227,13 @@ def build_board(*, tab, season, week, mode, viewer):
                 keep = {f.id for f in friends} | {viewer.id}
                 # You are always part of your own competition.
                 users = [u for u in users if u.id in keep]
+    elif mode == FILTER_DIVISION:
+        member_ids = division_member_ids(division, season)
+        if not member_ids:
+            division_empty = True
+            users = []
+        else:
+            users = [u for u in users if u.id in member_ids]
 
     rows = compute_standings(
         week=week if weekly else None, season=season,
@@ -223,6 +251,7 @@ def build_board(*, tab, season, week, mode, viewer):
         "winners": winners_of(rows) if weekly else [],
         "friends_empty": friends_empty,
         "needs_login": needs_login,
+        "division_empty": division_empty,
     }
 
 

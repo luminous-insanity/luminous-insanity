@@ -5,10 +5,10 @@
 
 {% block content %}
 
-<div class="page-head">
+<div class="page-head" style="justify-content:center;text-align:center;flex-direction:column;align-items:center;gap:14px">
     <div>
-        <h1>Leaderboard</h1>
-        <p>{{ selected_season }} season</p>
+        <h1 style="margin:0">Leaderboard</h1>
+        <p style="margin:4px 0 0">{{ selected_season }} season</p>
     </div>
 
     <div class="seg" role="tablist" aria-label="Leaderboard view">
@@ -16,101 +16,20 @@
            aria-selected="{% if tab == 'weekly' %}true{% else %}false{% endif %}">Weekly</a>
         <a href="{{ season_url }}" role="tab" class="{% if tab == 'season' %}is-active{% endif %}"
            aria-selected="{% if tab == 'season' %}true{% else %}false{% endif %}">Season</a>
-        <a href="{{ division_url }}" role="tab" class="{% if tab == 'division' %}is-active{% endif %}"
-           aria-selected="{% if tab == 'division' %}true{% else %}false{% endif %}">Division</a>
         <a href="{{ confidence_url }}" role="tab" class="{% if tab == 'confidence' %}is-active{% endif %}"
            aria-selected="{% if tab == 'confidence' %}true{% else %}false{% endif %}">Confidence</a>
     </div>
 </div>
 
 
-{% if tab == 'confidence' %}
-<section class="card" style="margin-bottom:18px">
-    <p class="muted">Confidence Points from correct Lean/Solid/Lock picks. Underdog locks earn a bonus. This does not change W-L-T standings.</p>
-    {% if confidence_rows %}
-    <table class="lb-table">
-        <thead><tr><th>#</th><th>Player</th><th>Points</th><th>Dog locks</th></tr></thead>
-        <tbody>
-        {% for row in confidence_rows %}
-            <tr class="{% if user.is_authenticated and row.user.id == user.id %}is-me{% endif %}">
-                <td><span class="lb-rank {% if row.rank == 1 %}top1{% elif row.rank == 2 %}top2{% elif row.rank == 3 %}top3{% endif %}">{{ row.rank }}</span></td>
-                <td>{{ row.user.username }}</td>
-                <td><strong>{{ row.points }}</strong></td>
-                <td>{{ row.underdog_locks }}</td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <p class="empty-state">No confidence points yet. Make picks with Lean, Solid, or Lock to climb this board.</p>
-    {% endif %}
-</section>
-{% elif tab == 'division' %}
-<div class="lb-controls">
-    <form method="get" class="inline-form">
-        <input type="hidden" name="tab" value="division">
-        <input type="hidden" name="season" value="{{ selected_season }}">
-        <label for="lb-division" class="visually-hidden">Division</label>
-        <select id="lb-division" name="division" onchange="this.form.submit()">
-            {% for item in division_choices %}
-                <option value="{{ item }}" {% if item == selected_division %}selected{% endif %}>{{ item }}</option>
-            {% endfor %}
-        </select>
-        <noscript><button type="submit" class="btn btn-sm">Show</button></noscript>
-    </form>
-</div>
-{% if playoff_race %}
-<p class="muted" style="margin:0 0 12px">
-    {{ member_count }} player{{ member_count|pluralize }} ·
-    Top {{ playoff_race.qualifiers_per_division }} qualify + 1 wildcard ·
-    {% if playoff_race.season_complete %}Qualification final{% else %}Provisional while games remain{% endif %}
-</p>
-{% endif %}
-{% if user_stats %}
-    <ol class="lb-list division-list">
-        {% for standing in user_stats %}
-            <li class="division-standing-row{% if standing.is_me %} is-me{% endif %}{% if standing.at_cutoff %} playoff-cutoff{% endif %}">
-                {% if standing.menu %}
-                <button type="button"
-                        class="lb-item{% if standing.is_me %} is-me{% endif %}"
-                        aria-haspopup="dialog"
-                        {% include 'main/_menu_attrs.html' with m=standing.menu %}
-                        style="width:100%;border:0;background:transparent;padding:0;text-align:left;display:flex;align-items:center;gap:12px;cursor:pointer;color:inherit;font:inherit">
-                    <span class="lb-rank">{% if forloop.counter == 1 %}👑{% else %}{{ standing.rank }}{% endif %}</span>
-                    <div class="division-player" style="flex:1;min-width:0">
-                        <strong>{{ standing.user.username }}</strong>
-                        {% if standing.is_me %}<span class="you-label">YOU</span>{% endif %}
-                        <span class="muted">{{ standing.completed }} completed · {{ standing.pending }} pending</span>
-                    </div>
-                    <div class="division-record">
-                        <strong>{{ standing.wins }}–{{ standing.losses }}–{{ standing.ties }}</strong>
-                        <span class="muted">W–L–T</span>
-                    </div>
-                </button>
-                {% else %}
-                    <span class="lb-rank">{% if forloop.counter == 1 %}👑{% else %}{{ standing.rank }}{% endif %}</span>
-                    <div class="division-player">
-                        <strong>{{ standing.user.username }}</strong>
-                        <span class="muted">{{ standing.completed }} completed</span>
-                    </div>
-                    <div class="division-record">
-                        <strong>{{ standing.wins }}–{{ standing.losses }}–{{ standing.ties }}</strong>
-                    </div>
-                {% endif %}
-            </li>
-        {% endfor %}
-    </ol>
-{% else %}
-    <p class="empty-state">No players in this division yet. Pick a favorite team on your profile to join a race.</p>
-{% endif %}
-<p class="muted" style="margin:14px 0 0;display:flex;flex-wrap:wrap;gap:10px 16px">
-    <a href="{% url 'divisions' %}?division={{ selected_division|urlencode }}">Division Wars — how qualification works</a>
-    <a href="{% url 'playoffs' %}">Playoff bracket</a>
-</p>
-{% else %}
-<div class="lb-controls">
+{# Shared control bar — centered and grouped #}
+<div class="lb-controls" style="justify-content:center;gap:12px 18px">
     <form method="get" class="inline-form">
         <input type="hidden" name="tab" value="{{ tab }}">
+        <input type="hidden" name="filter" value="{{ filter_mode }}">
+        {% if filter_mode == 'division' and tab != 'confidence' %}
+            <input type="hidden" name="division" value="{{ selected_division }}">
+        {% endif %}
         <label for="season" class="visually-hidden">Season</label>
         <select name="season" id="season" onchange="this.form.submit()">
             {% for season in seasons %}
@@ -124,6 +43,10 @@
         <form method="get" class="stepper" aria-label="Choose a week">
             <input type="hidden" name="tab" value="weekly">
             <input type="hidden" name="season" value="{{ selected_season }}">
+            <input type="hidden" name="filter" value="{{ filter_mode }}">
+            {% if filter_mode == 'division' %}
+                <input type="hidden" name="division" value="{{ selected_division }}">
+            {% endif %}
 
             {% if prev_url %}
                 <a href="{{ prev_url }}" class="stepper-btn" aria-label="Previous week" rel="prev">&lsaquo;</a>
@@ -152,12 +75,47 @@
            {% if filter_mode == 'all' %}aria-current="true"{% endif %}>Everyone</a>
         <a href="{{ friends_url }}" class="{% if filter_mode == 'friends' %}is-active{% endif %}"
            {% if filter_mode == 'friends' %}aria-current="true"{% endif %}>Friends</a>
+        {% if tab != 'confidence' %}
+        <a href="{{ division_filter_url }}" class="{% if filter_mode == 'division' %}is-active{% endif %}"
+           {% if filter_mode == 'division' %}aria-current="true"{% endif %}>Division</a>
+        {% endif %}
     </div>
 
     {% if champion %}
         <button type="button" class="btn btn-quiet btn-sm" data-champion-open>🏆 Season champion</button>
     {% endif %}
 </div>
+
+{% if filter_mode == 'division' and tab != 'confidence' %}
+<div class="lb-controls" style="justify-content:center;margin-top:-4px;gap:12px">
+    <form method="get" class="inline-form">
+        <input type="hidden" name="tab" value="{{ tab }}">
+        <input type="hidden" name="season" value="{{ selected_season }}">
+        <input type="hidden" name="filter" value="division">
+        {% if tab == 'weekly' %}
+            <input type="hidden" name="week" value="{{ selected_week }}">
+        {% endif %}
+        <label for="lb-division" class="visually-hidden">Division</label>
+        <select id="lb-division" name="division" onchange="this.form.submit()">
+            {% for item in division_choices %}
+                <option value="{{ item }}" {% if item == selected_division %}selected{% endif %}>{{ item }}</option>
+            {% endfor %}
+        </select>
+        <noscript><button type="submit" class="btn btn-sm">Show</button></noscript>
+    </form>
+    {% if member_count is not None %}
+    <p class="muted" style="margin:0">
+        {{ member_count }} player{{ member_count|pluralize }}
+        {% if tab == 'season' and playoff_race %}
+            · Top {{ playoff_race.qualifiers_per_division }} qualify + 1 wildcard
+            · {% if playoff_race.season_complete %}Qualification final{% else %}Provisional{% endif %}
+        {% endif %}
+        {% if my_division %}<span> · Yours: {{ my_division }}</span>{% endif %}
+    </p>
+    {% endif %}
+</div>
+{% endif %}
+
 
 {% if tab == 'season' and champion %}
     <section class="champion-spotlight" aria-label="{{ champion.season }} season champion">
@@ -177,7 +135,7 @@
     <section class="winner-card" aria-label="Week {{ selected_week }} {{ winner_label|lower }}">
         <span class="winner-crown" aria-hidden="true">👑</span>
         <div>
-            <p class="winner-title">Week {{ selected_week }} {{ winner_label|lower }}{% if winners|length > 1 %}s (tied){% endif %}{% if filter_mode == 'friends' %} among friends{% endif %}</p>
+            <p class="winner-title">Week {{ selected_week }} {{ winner_label|lower }}{% if winners|length > 1 %}s (tied){% endif %}{% if filter_mode == 'friends' %} among friends{% elif filter_mode == 'division' %} in {{ selected_division }}{% endif %}</p>
             <p class="winner-names">
                 {% for w in winners %}<strong>{{ w.user.username }}</strong> <span>{{ w.wins }}–{{ w.losses }}–{{ w.ties }}</span>{% if not forloop.last %}, {% endif %}{% endfor %}
             </p>
@@ -186,24 +144,50 @@
 {% endif %}
 
 {% if needs_login %}
-    <p class="empty"><a href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}">Log in</a> to compete with your friends.</p>
+    <p class="empty" style="text-align:center"><a href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}">Log in</a> to compete with your friends.</p>
 {% elif friends_empty %}
-    <div class="empty">
+    <div class="empty" style="text-align:center">
         <p>Add friends to start your own competition.</p>
         <a href="{% url 'dashboard' %}?friends=find" class="btn btn-sm">Find friends</a>
     </div>
+{% elif division_empty %}
+    <div class="empty" style="text-align:center">
+        <p>No players in {{ selected_division }} yet. Pick a favorite team on your profile to join a race.</p>
+        <a href="{% url 'profile' %}" class="btn btn-sm">Set favorite team</a>
+    </div>
+{% elif tab == 'confidence' %}
+<section class="card" style="margin-bottom:18px">
+    <p class="muted" style="text-align:center;margin-top:0">Confidence Points from correct Lean/Solid/Lock picks. Underdog locks earn a bonus. Does not change W-L-T standings.</p>
+    {% if confidence_rows %}
+    <table class="lb-table">
+        <thead><tr><th>#</th><th>Player</th><th>Points</th><th>Dog locks</th></tr></thead>
+        <tbody>
+        {% for row in confidence_rows %}
+            <tr class="{% if user.is_authenticated and row.user.id == user.id %}is-me{% endif %}">
+                <td><span class="lb-rank {% if row.rank == 1 %}top1{% elif row.rank == 2 %}top2{% elif row.rank == 3 %}top3{% endif %}">{{ row.rank }}</span></td>
+                <td>{{ row.user.username }}</td>
+                <td><strong>{{ row.points }}</strong></td>
+                <td>{{ row.underdog_locks }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="empty-state" style="text-align:center">No confidence points yet for this selection. Make picks with Lean, Solid, or Lock to climb this board.</p>
+    {% endif %}
+</section>
 {% elif user_stats %}
-    <ol class="lb-list">
+    <ol class="lb-list{% if filter_mode == 'division' %} division-list{% endif %}">
         {% for standing in user_stats %}
-            <li>
+            <li{% if filter_mode == 'division' %} class="division-standing-row{% if standing.is_me %} is-me{% endif %}{% if standing.at_cutoff %} playoff-cutoff{% endif %}"{% endif %}>
                 <button type="button"
                         class="lb-item{% if standing.is_me %} is-me{% endif %}"
                         aria-haspopup="dialog"
-                        {% include 'main/_menu_attrs.html' with m=standing.menu %}
+                        {% if standing.menu %}{% include 'main/_menu_attrs.html' with m=standing.menu %}{% endif %}
                         data-reaction-url="{{ standing.reaction_url }}" data-reaction-season="{{ selected_season }}" data-reaction-week="{{ selected_week }}" data-reaction-allowed="{% if standing.can_react %}1{% else %}0{% endif %}" data-reaction-current="{{ standing.my_reaction.emoji|default:'' }}" data-reaction-clap="{{ standing.reaction_clap|default:0 }}" data-reaction-fire="{{ standing.reaction_fire|default:0 }}" data-reaction-crown="{{ standing.reaction_crown|default:0 }}">
 
                     <span class="lb-rank">
-                        {{ standing.rank }}
+                        {% if filter_mode == 'division' and forloop.counter == 1 %}👑{% else %}{{ standing.rank }}{% endif %}
                         {% if tab == 'weekly' %}
                             <span class="rank-move rank-{{ standing.movement_kind }}" aria-label="Rank change: {{ standing.movement_label }}">{{ standing.movement_label }}</span>
                         {% endif %}
@@ -223,14 +207,19 @@
             </li>
         {% endfor %}
     </ol>
+    {% if filter_mode == 'division' %}
+    <p class="muted" style="margin:14px 0 0;display:flex;flex-wrap:wrap;justify-content:center;gap:10px 16px">
+        <a href="{% url 'divisions' %}?division={{ selected_division|urlencode }}">Division Wars — how qualification works</a>
+        <a href="{% url 'playoffs' %}">Playoff bracket</a>
+    </p>
+    {% endif %}
 {% else %}
-    <p class="empty">No standings for this selection yet.</p>
+    <p class="empty" style="text-align:center">No standings for this selection yet.</p>
 {% endif %}
 
 {% include 'main/_player_menu.html' %}
 
 {% if champion %}
-    <!-- Season champion reveal (opens once automatically, replayable any time) -->
     <div id="champion-modal" class="champion-modal" hidden
          data-auto="{% if auto_reveal %}1{% else %}0{% endif %}">
         <div class="champion-modal-backdrop" data-champion-close></div>
@@ -254,5 +243,4 @@
 {% endif %}
 
 <script src="{% static 'js/leaderboard.js' %}"></script>
-{% endif %}
 {% endblock %}
