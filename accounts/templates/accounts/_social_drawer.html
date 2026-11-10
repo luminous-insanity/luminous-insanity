@@ -1,0 +1,464 @@
+{% if user.is_authenticated %}
+<!-- Social drawer toggle (site-wide, identical on every page) -->
+<button
+    type="button"
+    class="friends-toggle"
+    id="friendsToggle"
+    aria-controls="friendsDrawer"
+    aria-expanded="false"
+>
+    <span aria-hidden="true">👥</span>
+    Social
+</button>
+
+<div class="friends-backdrop" id="friendsBackdrop"></div>
+
+<aside
+    class="friends-drawer"
+    id="friendsDrawer"
+    aria-label="Social panel"
+    aria-hidden="true"
+>
+    <div class="friends-drawer-header">
+        <h2>Social</h2>
+        <button type="button" class="friends-close" id="friendsClose" aria-label="Close social panel">&times;</button>
+    </div>
+
+    <div class="social-drawer-body">
+        <div class="social-section is-active" id="socialSectionFriends" data-social-section="friends">
+
+        <form method="get" class="friend-search-form">
+            <input type="hidden" name="season" value="{{ social_selected_season }}">
+            <label for="friend_search">Find players</label>
+            <div class="friend-search-input-wrap">
+                <input
+                    type="search"
+                    id="friend_search"
+                    name="friend_search"
+                    value="{{ friend_query }}"
+                    placeholder="Search by username..."
+                    maxlength="150"
+                >
+                <button type="submit" class="friend-search-button" aria-label="Search players" title="Search players">⌕</button>
+            </div>
+        </form>
+
+        {% if friend_query %}
+            <div class="friend-search-results">
+                <h3>Search Results</h3>
+                {% for found_user in friend_results %}
+                    <div class="friend-list-item friend-search-result">
+                        <span>{{ found_user.username }}</span>
+                        <form method="post" action="{% url 'send_friend_request' found_user.id %}">
+                            {% csrf_token %}
+                            <button type="submit" class="add-friend-button">Add Friend</button>
+                        </form>
+                    </div>
+                {% empty %}
+                    <p>No users found matching "{{ friend_query }}".</p>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <section class="invite-box" aria-label="Invite a friend">
+            <button type="button" class="invite-button" id="inviteToggle"
+                    aria-expanded="false" aria-controls="invitePanel">
+                <span aria-hidden="true">✉</span> Invite a Friend
+            </button>
+            <p class="invite-hint">Not on GameDayPicks yet? Send them an invite.</p>
+            <div class="invite-panel" id="invitePanel" hidden
+                 data-url="{{ invite_url }}"
+                 data-text="{{ invite_text }}"
+                 data-message="{{ invite_message }}">
+                <button type="button" class="invite-option" id="inviteShare" hidden>
+                    <span aria-hidden="true">📤</span> Share…
+                </button>
+                <a class="invite-option"
+                   href="sms:?&amp;body={{ invite_message|urlencode:'' }}">
+                    <span aria-hidden="true">💬</span> Text Message
+                </a>
+                <a class="invite-option"
+                   href="mailto:?subject={{ 'Join me on GameDayPicks'|urlencode:'' }}&amp;body={{ invite_message|urlencode:'' }}">
+                    <span aria-hidden="true">📧</span> Email
+                </a>
+                <a class="invite-option" target="_blank" rel="noopener"
+                   href="https://wa.me/?text={{ invite_message|urlencode:'' }}">
+                    <span aria-hidden="true">🟢</span> WhatsApp
+                </a>
+                <button type="button" class="invite-option" id="inviteCopy">
+                    <span aria-hidden="true">🔗</span> Copy Invite
+                </button>
+                <p class="invite-status" id="inviteStatus" role="status" aria-live="polite"></p>
+            </div>
+        </section>
+
+        <div class="friends-tabs" role="tablist" aria-label="Friends navigation">
+            <button type="button" class="friends-tab is-active" id="friendsTabFriends"
+                    role="tab" aria-selected="true" aria-controls="friendsPanelFriends">
+                Friends
+            </button>
+            <button type="button" class="friends-tab" id="friendsTabRequests"
+                    role="tab" aria-selected="false" aria-controls="friendsPanelRequests">
+                Requests
+                {% if incoming_requests %}
+                    <span class="friend-request-dot" aria-label="Pending requests"></span>
+                {% endif %}
+            </button>
+        </div>
+
+        <div class="friends-tab-panel is-active" id="friendsPanelFriends" role="tabpanel" aria-labelledby="friendsTabFriends">
+            {% if friend_rows %}
+                <p class="friends-tap-hint">Tap a friend for their profile, picks or a challenge.</p>
+            {% endif %}
+            {% for row in friend_rows %}
+                <button type="button" class="friend-list-item friend-menu-button"
+                        aria-haspopup="dialog"
+                        {% if row.menu %}{% include 'main/_menu_attrs.html' with m=row.menu %}{% endif %}
+                        data-reaction-url="{{ row.reaction_url }}" data-reaction-season="{{ social_selected_season }}" data-reaction-week="{{ social_reaction_week }}" data-reaction-allowed="1" data-reaction-current="{{ row.my_reaction.emoji|default:'' }}" data-reaction-clap="{{ row.reaction_clap|default:0 }}" data-reaction-fire="{{ row.reaction_fire|default:0 }}" data-reaction-crown="{{ row.reaction_crown|default:0 }}">
+                    <span>{{ row.user.username }}</span>
+                    <span class="friend-chevron" aria-hidden="true">›</span>
+                </button>
+            {% empty %}
+                <p class="friends-empty-message">You haven't added any friends yet.</p>
+            {% endfor %}
+        </div>
+
+        <div class="friends-tab-panel" id="friendsPanelRequests" role="tabpanel" aria-labelledby="friendsTabRequests" hidden>
+            {% for friend_request in incoming_requests %}
+                <div class="friend-list-item friend-request-item">
+                    <span class="friend-request-username">{{ friend_request.sender.username }}</span>
+                    <div class="friend-request-actions">
+                        <form method="post" action="{% url 'respond_friend_request' friend_request.id 'accept' %}?friends=requests">
+                            {% csrf_token %}
+                            <button type="submit" class="accept-friend-button">Accept</button>
+                        </form>
+                        <form method="post" action="{% url 'respond_friend_request' friend_request.id 'decline' %}?friends=requests">
+                            {% csrf_token %}
+                            <button type="submit" class="decline-friend-button">Decline</button>
+                        </form>
+                    </div>
+                </div>
+            {% empty %}
+                <p class="friends-empty-message">No pending friend requests.</p>
+            {% endfor %}
+        </div>
+
+        </div><!-- /#socialSectionFriends -->
+
+        <div class="social-section" id="socialSectionLive" data-social-section="live" hidden>
+            <div class="section-head" style="margin-bottom:10px">
+                <h3 style="margin:0">🔴 Live energy</h3>
+                <a href="{% url 'picks' %}?season={{ social_selected_season }}&amp;week={{ social_mission_week }}">View games</a>
+            </div>
+            <div id="gameChat"
+                 data-csrf="{{ csrf_token }}"
+                 data-poll-url="{% url 'chat_poll' '__GAME__' %}"
+                 data-send-url="{% url 'chat_send' '__GAME__' %}"
+                 data-start-url="{% url 'chat_start' '__GAME__' %}"
+                 data-initial-game="{{ request.GET.chat|default:'' }}">
+            {% if live_moments and live_moments.live_games %}
+            <ul class="live-game-list" id="socialLiveGameList">
+                {% for g in live_moments.live_games %}
+                <li class="live-game-row" data-live-game data-game-id="{{ g.game_id }}">
+                    <button type="button" class="live-game-toggle" aria-expanded="false">
+                        <span class="pill pill-live">{{ g.status|upper }}</span>
+                        <strong data-game-line>{{ g.away_team }} {% if g.away_score is not None %}{{ g.away_score }}{% endif %} @ {{ g.home_team }} {% if g.home_score is not None %}{{ g.home_score }}{% endif %}</strong>
+                        <span class="gchat-live-badge pill pill-live" hidden>CHAT</span>
+                    </button>
+                    <form method="post" action="{% url 'react_to_game' g.game_id %}" class="live-react-form" hidden>
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <button type="submit" name="emoji" value="🔥" class="reaction-btn" title="Fire">🔥</button>
+                        <button type="submit" name="emoji" value="😱" class="reaction-btn" title="Shock">😱</button>
+                        <button type="submit" name="emoji" value="💪" class="reaction-btn" title="Clutch">💪</button>
+                        <button type="submit" name="emoji" value="🎉" class="reaction-btn" title="Party">🎉</button>
+                        <button type="submit" name="emoji" value="💔" class="reaction-btn" title="Heartbreak">💔</button>
+                    </form>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <ul class="live-game-list" id="socialLiveGameList"></ul>
+            <p class="friends-empty-message">No live games right now. Check back during kickoff windows.</p>
+            {% endif %}
+                <div id="gchatPanel" class="gchat-panel" hidden>
+                    <div class="gchat-head">
+                        <strong id="gchatTitle">Game chat</strong>
+                        <span id="gchatState" class="gchat-state muted"></span>
+                    </div>
+                    <div id="gchatStart" class="gchat-start" hidden>
+                        <p class="muted">No one is chatting yet.</p>
+                        <button type="button" class="btn btn-sm btn-red" id="gchatStartBtn">Start chat</button>
+                    </div>
+                    <div id="gchatLog" class="gchat-log" role="log" aria-live="polite"></div>
+                    <div id="gchatEmotes" class="gchat-emotes">
+                        <button type="button" data-emoji="🔥" title="Fire">🔥</button>
+                        <button type="button" data-emoji="😱" title="Shock">😱</button>
+                        <button type="button" data-emoji="💪" title="Clutch">💪</button>
+                        <button type="button" data-emoji="🎉" title="Party">🎉</button>
+                        <button type="button" data-emoji="💔" title="Heartbreak">💔</button>
+                    </div>
+                    <div id="gchatTarget" class="gchat-target" hidden>
+                        Whispering <strong id="gchatTargetName"></strong>
+                        <button type="button" id="gchatTargetClear" aria-label="Clear whisper">&times;</button>
+                    </div>
+                    <form id="gchatForm" class="gchat-form" autocomplete="off">
+                        <input type="text" id="gchatInput" maxlength="280" placeholder="Say something… (/help)" aria-label="Chat message">
+                        <button type="submit" id="gchatSend" class="btn btn-sm btn-red">Send</button>
+                    </form>
+                </div>
+            </div>
+            {% if live_moments and live_moments.reactions %}
+            <ul class="activity-list" style="margin-top:10px">
+                {% for r in live_moments.reactions %}
+                <li class="activity-item">
+                    <span class="activity-icon">{{ r.emoji }}</span>
+                    <div class="activity-body">
+                        <p><strong>{{ r.user.username }}</strong> on {{ r.game.away_team }} @ {{ r.game.home_team }}</p>
+                        <p class="detail">{{ r.created_at|timesince }} ago</p>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div><!-- /#socialSectionLive -->
+
+        <div class="social-section" id="socialSectionMoments" data-social-section="moments" hidden>
+            <div class="section-head" style="margin-bottom:10px">
+                <h3 style="margin:0">✨ Shared Moments</h3>
+                <a href="{% url 'share_hub' %}">View all</a>
+            </div>
+            <p class="muted" style="margin:0 0 12px">Your perfect weeks and head-to-head rivalry moments, ready to share.</p>
+            <section class="shared-moment-group">
+                <h4>Perfect weeks · {{ social_selected_season }}</h4>
+                {% if shared_moment_weeks %}
+                    <ul class="stack" style="list-style:none;padding:0">
+                        {% for item in shared_moment_weeks %}
+                            <li class="row">
+                                <span>🏆 Week {{ item.week }} · {{ item.record.wins }}-0-0</span>
+                                <a class="btn btn-sm" href="{% url 'share_perfect_week' request.user.id social_selected_season item.week %}">Open card</a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="friends-empty-message">No perfect weeks yet. Get every pick right in a week to unlock a share card.</p>
+                {% endif %}
+            </section>
+            <section class="shared-moment-group" style="margin-top:18px">
+                <h4>Rivalries</h4>
+                {% if shared_moment_challenges %}
+                    <ul class="stack" style="list-style:none;padding:0">
+                        {% for c in shared_moment_challenges %}
+                            <li class="row">
+                                <span>{{ c.challenger.username }} vs {{ c.opponent.username }} · W{{ c.week }}</span>
+                                <a class="btn btn-sm btn-quiet" href="{% url 'share_challenge' c.id %}">Card</a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="friends-empty-message">Challenge a friend to create a rivalry moment.</p>
+                {% endif %}
+            </section>
+        </div><!-- /#socialSectionMoments -->
+    </div><!-- /.social-drawer-body -->
+
+    <nav class="social-bottom-nav" role="tablist" aria-label="Social sections">
+        <button type="button" class="social-nav-btn is-active" id="socialNavFriends" role="tab" aria-selected="true" aria-controls="socialSectionFriends" data-social-nav="friends">Friends</button>
+        <button type="button" class="social-nav-btn" id="socialNavLive" role="tab" aria-selected="false" aria-controls="socialSectionLive" data-social-nav="live">Live chat</button>
+        <button type="button" class="social-nav-btn" id="socialNavMoments" role="tab" aria-selected="false" aria-controls="socialSectionMoments" data-social-nav="moments">Moments</button>
+    </nav>
+</aside>
+
+<script>
+(function () {
+    const toggle = document.getElementById('friendsToggle');
+    const drawer = document.getElementById('friendsDrawer');
+    const backdrop = document.getElementById('friendsBackdrop');
+    const closeButton = document.getElementById('friendsClose');
+    if (!toggle || !drawer || !backdrop || !closeButton) return;
+
+    function openDrawer() {
+        drawer.classList.add('is-open');
+        backdrop.classList.add('is-open');
+        document.body.classList.add('friends-drawer-open');
+        toggle.setAttribute('aria-expanded', 'true');
+        drawer.setAttribute('aria-hidden', 'false');
+    }
+    function closeDrawer() {
+        drawer.classList.remove('is-open');
+        backdrop.classList.remove('is-open');
+        document.body.classList.remove('friends-drawer-open');
+        toggle.setAttribute('aria-expanded', 'false');
+        drawer.setAttribute('aria-hidden', 'true');
+    }
+    window.GDPOpenSocialDrawer = openDrawer;
+    window.GDPCloseSocialDrawer = closeDrawer;
+
+    toggle.addEventListener('click', openDrawer);
+    closeButton.addEventListener('click', closeDrawer);
+    backdrop.addEventListener('click', closeDrawer);
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && drawer.classList.contains('is-open')) closeDrawer();
+    });
+
+    document.querySelectorAll('[data-open-friends]').forEach(function (link) {
+        link.addEventListener('click', function (event) {
+            event.preventDefault();
+            openDrawer();
+        });
+    });
+
+    // Friends / Requests sub-tabs
+    const friendsTab = document.getElementById('friendsTabFriends');
+    const requestsTab = document.getElementById('friendsTabRequests');
+    const friendsPanel = document.getElementById('friendsPanelFriends');
+    const requestsPanel = document.getElementById('friendsPanelRequests');
+    function activateFriendsTab(showRequests) {
+        if (!friendsTab || !requestsTab || !friendsPanel || !requestsPanel) return;
+        friendsTab.classList.toggle('is-active', !showRequests);
+        requestsTab.classList.toggle('is-active', showRequests);
+        friendsTab.setAttribute('aria-selected', String(!showRequests));
+        requestsTab.setAttribute('aria-selected', String(showRequests));
+        friendsPanel.hidden = showRequests;
+        requestsPanel.hidden = !showRequests;
+        friendsPanel.classList.toggle('is-active', !showRequests);
+        requestsPanel.classList.toggle('is-active', showRequests);
+    }
+    if (friendsTab) friendsTab.addEventListener('click', function () { activateFriendsTab(false); });
+    if (requestsTab) requestsTab.addEventListener('click', function () { activateFriendsTab(true); });
+
+    const socialSections = {
+        friends: document.getElementById('socialSectionFriends'),
+        live: document.getElementById('socialSectionLive'),
+        moments: document.getElementById('socialSectionMoments'),
+    };
+    const socialNavButtons = {
+        friends: document.getElementById('socialNavFriends'),
+        live: document.getElementById('socialNavLive'),
+        moments: document.getElementById('socialNavMoments'),
+    };
+    function activateSocialSection(section) {
+        Object.entries(socialSections).forEach(([key, element]) => {
+            if (!element) return;
+            const active = key === section;
+            element.hidden = !active;
+            element.classList.toggle('is-active', active);
+        });
+        Object.entries(socialNavButtons).forEach(([key, button]) => {
+            if (!button) return;
+            const active = key === section;
+            button.classList.toggle('is-active', active);
+            button.setAttribute('aria-selected', String(active));
+        });
+    }
+    window.GDPActivateSocialSection = activateSocialSection;
+    Object.entries(socialNavButtons).forEach(([section, button]) => {
+        if (button) button.addEventListener('click', () => activateSocialSection(section));
+    });
+
+    // Live energy accordion
+    const liveGameList = document.getElementById('socialLiveGameList');
+    if (liveGameList) {
+        liveGameList.querySelectorAll('[data-live-game]').forEach(function (row) {
+            const toggleBtn = row.querySelector('.live-game-toggle');
+            const form = row.querySelector('.live-react-form');
+            if (!toggleBtn || !form) return;
+            toggleBtn.addEventListener('click', function () {
+                const opening = !row.classList.contains('is-open');
+                liveGameList.querySelectorAll('[data-live-game].is-open').forEach(function (openRow) {
+                    if (openRow === row) return;
+                    openRow.classList.remove('is-open');
+                    const openForm = openRow.querySelector('.live-react-form');
+                    const openToggle = openRow.querySelector('.live-game-toggle');
+                    if (openForm) openForm.hidden = true;
+                    if (openToggle) openToggle.setAttribute('aria-expanded', 'false');
+                });
+                row.classList.toggle('is-open', opening);
+                form.hidden = !opening;
+                toggleBtn.setAttribute('aria-expanded', String(opening));
+            });
+        });
+    }
+
+    document.querySelectorAll('[data-open-friend-requests]').forEach(function (link) {
+        link.addEventListener('click', function (event) {
+            event.preventDefault();
+            activateSocialSection('friends');
+            openDrawer();
+            activateFriendsTab(true);
+        });
+    });
+
+    document.addEventListener('gdp:open-chat', function (event) {
+        const gameId = event.detail && event.detail.gameId;
+        const label = event.detail && event.detail.label;
+        activateSocialSection('live');
+        openDrawer();
+        if (window.GDPChat && typeof window.GDPChat.open === 'function') {
+            window.GDPChat.open(gameId || null, label || null);
+        }
+    });
+
+    try {
+        const params = new URLSearchParams(window.location.search);
+        const chatGame = params.get('chat');
+        if (chatGame) {
+            document.dispatchEvent(new CustomEvent('gdp:open-chat', { detail: { gameId: chatGame } }));
+        }
+        if (params.get('friends') === 'find' || params.get('friend_search')) {
+            activateSocialSection('friends');
+            openDrawer();
+        }
+        if (params.get('friends') === 'requests') {
+            activateSocialSection('friends');
+            openDrawer();
+            activateFriendsTab(true);
+        }
+    } catch (e) { /* ignore */ }
+})();
+</script>
+
+<script>
+(function () {
+    const toggle = document.getElementById('inviteToggle');
+    const panel = document.getElementById('invitePanel');
+    const shareButton = document.getElementById('inviteShare');
+    const copyButton = document.getElementById('inviteCopy');
+    const status = document.getElementById('inviteStatus');
+    if (!toggle || !panel) return;
+
+    toggle.addEventListener('click', function () {
+        const opening = panel.hidden;
+        panel.hidden = !opening;
+        toggle.setAttribute('aria-expanded', String(opening));
+    });
+
+    if (navigator.share && shareButton) {
+        shareButton.hidden = false;
+        shareButton.addEventListener('click', function () {
+            navigator.share({
+                title: 'Join me on GameDayPicks',
+                text: panel.dataset.text,
+                url: panel.dataset.url
+            }).catch(function () { /* user cancelled */ });
+        });
+    }
+
+    if (copyButton) {
+        copyButton.addEventListener('click', function () {
+            const msg = panel.dataset.message || panel.dataset.url || '';
+            function ok() {
+                if (status) status.textContent = 'Invite link copied.';
+            }
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(msg).then(ok).catch(function () {
+                    status && (status.textContent = msg);
+                });
+            } else if (status) {
+                status.textContent = msg;
+            }
+        });
+    }
+})();
+</script>
+{% endif %}

@@ -156,26 +156,37 @@
         <a href="{% url 'profile' %}" class="btn btn-sm">Set favorite team</a>
     </div>
 {% elif tab == 'confidence' %}
-<section class="card" style="margin-bottom:18px">
-    <p class="muted" style="text-align:center;margin-top:0">Confidence Points from correct Lean/Solid/Lock picks. Underdog locks earn a bonus. Does not change W-L-T standings.</p>
-    {% if confidence_rows %}
-    <table class="lb-table">
-        <thead><tr><th>#</th><th>Player</th><th>Points</th><th>Dog locks</th></tr></thead>
-        <tbody>
+<p class="muted" style="text-align:center;margin:0 0 14px">Confidence Points from correct Lean/Solid/Lock picks. Underdog locks earn a bonus. Does not change W-L-T standings.</p>
+{% if needs_login %}
+    <p class="empty" style="text-align:center"><a href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}">Log in</a> to compete with your friends.</p>
+{% elif friends_empty %}
+    <div class="empty" style="text-align:center">
+        <p>Add friends to start your own competition.</p>
+        <a href="{% url 'dashboard' %}?friends=find" class="btn btn-sm">Find friends</a>
+    </div>
+{% elif confidence_rows %}
+    <ol class="lb-list">
         {% for row in confidence_rows %}
-            <tr class="{% if user.is_authenticated and row.user.id == user.id %}is-me{% endif %}">
-                <td><span class="lb-rank {% if row.rank == 1 %}top1{% elif row.rank == 2 %}top2{% elif row.rank == 3 %}top3{% endif %}">{{ row.rank }}</span></td>
-                <td>{{ row.user.username }}</td>
-                <td><strong>{{ row.points }}</strong></td>
-                <td>{{ row.underdog_locks }}</td>
-            </tr>
+            <li>
+                <button type="button"
+                        class="lb-item{% if row.is_me %} is-me{% endif %}"
+                        aria-haspopup="dialog"
+                        {% if row.menu %}{% include 'main/_menu_attrs.html' with m=row.menu %}{% endif %}>
+                    <span class="lb-rank{% if row.rank == 1 %} is-gold{% elif row.rank == 2 %} is-silver{% elif row.rank == 3 %} is-bronze{% endif %}">
+                        {{ row.rank }}
+                    </span>
+                    <span class="lb-name">{{ row.user.username }}{% if row.is_me %} <em class="you-tag">You</em>{% endif %}</span>
+                    <span class="lb-record">
+                        <strong>{{ row.points }} pts</strong>
+                        <small>{% if row.underdog_locks %}{{ row.underdog_locks }} dog lock{{ row.underdog_locks|pluralize }}{% else %}—{% endif %}</small>
+                    </span>
+                </button>
+            </li>
         {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <p class="empty-state" style="text-align:center">No confidence points yet for this selection. Make picks with Lean, Solid, or Lock to climb this board.</p>
-    {% endif %}
-</section>
+    </ol>
+{% else %}
+    <p class="empty" style="text-align:center">No confidence points yet for this selection. Make picks with Lean, Solid, or Lock to climb this board.</p>
+{% endif %}
 {% elif user_stats %}
     <ol class="lb-list{% if filter_mode == 'division' %} division-list{% endif %}">
         {% for standing in user_stats %}
@@ -186,7 +197,7 @@
                         {% if standing.menu %}{% include 'main/_menu_attrs.html' with m=standing.menu %}{% endif %}
                         data-reaction-url="{{ standing.reaction_url }}" data-reaction-season="{{ selected_season }}" data-reaction-week="{{ selected_week }}" data-reaction-allowed="{% if standing.can_react %}1{% else %}0{% endif %}" data-reaction-current="{{ standing.my_reaction.emoji|default:'' }}" data-reaction-clap="{{ standing.reaction_clap|default:0 }}" data-reaction-fire="{{ standing.reaction_fire|default:0 }}" data-reaction-crown="{{ standing.reaction_crown|default:0 }}">
 
-                    <span class="lb-rank">
+                    <span class="lb-rank{% if standing.rank == 1 %} is-gold{% elif standing.rank == 2 %} is-silver{% elif standing.rank == 3 %} is-bronze{% endif %}">
                         {% if filter_mode == 'division' and forloop.counter == 1 %}👑{% else %}{{ standing.rank }}{% endif %}
                         {% if tab == 'weekly' %}
                             <span class="rank-move rank-{{ standing.movement_kind }}" aria-label="Rank change: {{ standing.movement_label }}">{{ standing.movement_label }}</span>
@@ -217,7 +228,6 @@
     <p class="empty" style="text-align:center">No standings for this selection yet.</p>
 {% endif %}
 
-{% include 'main/_player_menu.html' %}
 
 {% if champion %}
     <div id="champion-modal" class="champion-modal" hidden

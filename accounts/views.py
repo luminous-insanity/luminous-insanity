@@ -123,6 +123,70 @@ def _selected_season(request):
 
 
 
+
+
+def build_activity_feed(user, friends, limit=None):
+    """Recent competition activity for the dashboard / activity page.
+
+    Each item has a stable `key` used to mark items as seen on the dashboard.
+    """
+    activity_feed = []
+    friend_ids = [friend.id for friend in friends]
+    if friend_ids:
+        for unlock in AchievementUnlock.objects.filter(
+            user_id__in=friend_ids
+        ).select_related('user').order_by('-unlocked_at')[:20]:
+            activity_feed.append({
+                'key': f'achievement:{unlock.id}',
+                'at': unlock.unlocked_at,
+                'kind': 'achievement',
+                'icon': '🏆',
+                'message': f'{unlock.user.username} earned an achievement.',
+                'detail': f'Level {unlock.level}',
+                'url': reverse('achievements'),
+            })
+
+    recent_challenges = Challenge.objects.filter(
+        Q(challenger=user) | Q(opponent=user)
+    ).select_related('challenger', 'opponent').order_by('-created_at')[:20]
+    for challenge in recent_challenges:
+        if challenge.status == Challenge.PENDING:
+            message = f'{challenge.challenger.username} challenged {challenge.opponent.username}.'
+            icon = '⚔️'
+        elif challenge.status == Challenge.ACCEPTED:
+            message = f'{challenge.challenger.username} and {challenge.opponent.username} are competing.'
+            icon = '🏈'
+        elif challenge.status in (Challenge.DECLINED, Challenge.CANCELLED):
+            message = (
+                f'The challenge between {challenge.challenger.username} and '
+                f'{challenge.opponent.username} was {challenge.get_status_display().lower()}.'
+            )
+            icon = 'ℹ️'
+        else:
+            continue
+        activity_feed.append({
+            'key': f'challenge:{challenge.id}',
+            'at': challenge.responded_at or challenge.created_at,
+            'kind': 'challenge',
+            'icon': icon,
+            'message': message,
+            'detail': f'Season {challenge.season}, Week {challenge.week}',
+            'url': reverse('challenges'),
+        })
+
+    activity_feed.sort(key=lambda item: item['at'], reverse=True)
+    if limit is not None:
+        activity_feed = activity_feed[:limit]
+    return activity_feed
+
+
+def _seen_activity_keys(request):
+    keys = request.session.get('seen_activity_keys')
+    if not isinstance(keys, list):
+        keys = []
+    return keys
+
+
 @login_required
 def dashboard(request):
     selected_season, seasons = _selected_season(request)
@@ -265,50 +329,10 @@ def dashboard(request):
         "Join here:"
     )
 
-    # A compact, informational feed. Keep it separate from notifications:
-    # notifications are actions for the current user; this feed is recent competition activity.
-    activity_feed = []
-    friend_ids = [friend.id for friend in friends]
-    if friend_ids:
-        for unlock in AchievementUnlock.objects.filter(
-            user_id__in=friend_ids
-        ).select_related('user').order_by('-unlocked_at')[:8]:
-            activity_feed.append({
-                'at': unlock.unlocked_at,
-                'kind': 'achievement',
-                'icon': '🏆',
-                'message': f'{unlock.user.username} earned an achievement.',
-                'detail': f'Level {unlock.level}',
-                'url': reverse('achievements'),
-            })
-
-    recent_challenges = Challenge.objects.filter(
-        Q(challenger=request.user) | Q(opponent=request.user)
-    ).select_related('challenger', 'opponent').order_by('-created_at')[:8]
-    for challenge in recent_challenges:
-        other_player = challenge.opponent if challenge.challenger_id == request.user.id else challenge.challenger
-        if challenge.status == Challenge.PENDING:
-            message = f'{challenge.challenger.username} challenged {challenge.opponent.username}.'
-            icon = '⚔️'
-        elif challenge.status == Challenge.ACCEPTED:
-            message = f'{challenge.challenger.username} and {challenge.opponent.username} are competing.'
-            icon = '🏈'
-        elif challenge.status in (Challenge.DECLINED, Challenge.CANCELLED):
-            message = f'The challenge between {challenge.challenger.username} and {challenge.opponent.username} was {challenge.get_status_display().lower()}.'
-            icon = 'ℹ️'
-        else:
-            continue
-        activity_feed.append({
-            'at': challenge.responded_at or challenge.created_at,
-            'kind': 'challenge',
-            'icon': icon,
-            'message': message,
-            'detail': f'Season {challenge.season}, Week {challenge.week}',
-            'url': reverse('challenges'),
-        })
-
-    activity_feed.sort(key=lambda item: item['at'], reverse=True)
-    activity_feed = activity_feed[:10]
+    # Compact dashboard feed: a few unseen items; full history on activity page.
+    seen_keys = set(_seen_activity_keys(request))
+    all_activity = build_activity_feed(request.user, friends, limit=40)
+    activity_feed = [item for item in all_activity if item['key'] not in seen_keys][:4]
 
     # Shared Moments are surfaced directly inside the dashboard Social Drawer.
     # Reuse the same share-card records and URLs as the existing Share Moments hub.
@@ -645,15 +669,24 @@ def friend_search(request):
 
 @login_required
 def send_friend_request(request, user_id):
+    def _back():
+        # Prefer explicit next, then referer (leaderboard player menu), else dashboard.
+        nxt = (request.POST.get('next') or request.GET.get('next') or '').strip()
+        if nxt.startswith('/') and not nxt.startswith('//'):
+            return nxt
+        ref = request.META.get('HTTP_REFERER', '')
+        if ref:
+            return ref
+        return reverse('dashboard')
 
     if request.method != 'POST':
-        return redirect('dashboard')
+        return redirect(_back())
 
     recipient = get_object_or_404(User, pk=user_id)
 
     if recipient == request.user:
         messages.error(request, "You cannot send a friend request to yourself.")
-        return redirect('dashboard')
+        return redirect(_back())
 
     existing_request = FriendRequest.objects.filter(
         sender=request.user,
@@ -662,7 +695,7 @@ def send_friend_request(request, user_id):
 
     if existing_request:
         messages.info(request, "You've already sent this user a friend request.")
-        return redirect('dashboard')
+        return redirect(_back())
 
     reverse_request = FriendRequest.objects.filter(
         sender=recipient,
@@ -674,9 +707,9 @@ def send_friend_request(request, user_id):
         messages.info(
             request,
             "This user has already requested to be your friend. "
-            "You can respond to their request when we add request management."
+            "Respond from your dashboard friend requests."
         )
-        return redirect('dashboard')
+        return redirect(f"{reverse('dashboard')}?friends=requests")
 
     already_friends = FriendRequest.objects.filter(
         sender=request.user,
@@ -690,7 +723,7 @@ def send_friend_request(request, user_id):
 
     if already_friends:
         messages.info(request, "You're already friends with this user.")
-        return redirect('dashboard')
+        return redirect(_back())
 
     FriendRequest.objects.create(
         sender=request.user,
@@ -702,7 +735,7 @@ def send_friend_request(request, user_id):
         request,
         f"Friend request sent to {recipient.username}."
     )
-    return redirect('dashboard')
+    return redirect(_back())
 
 
 @login_required
@@ -802,3 +835,39 @@ def week_recap(request):
         'seasons': seasons,
         'weeks': range(1, 19),
     })
+
+
+
+@login_required
+def activity_page(request):
+    """Full recent-activity list (includes items already dismissed from the dashboard)."""
+    accepted = FriendRequest.objects.filter(
+        status=FriendRequest.ACCEPTED,
+    ).filter(
+        Q(sender=request.user) | Q(receiver=request.user)
+    ).select_related('sender', 'receiver')
+    friends = [
+        fr.receiver if fr.sender_id == request.user.id else fr.sender
+        for fr in accepted
+    ]
+    feed = build_activity_feed(request.user, friends, limit=50)
+    return render(request, 'accounts/activity.html', {
+        'activity_feed': feed,
+    })
+
+
+@login_required
+def activity_open(request):
+    """Mark one activity item as seen on the dashboard, then redirect to its target."""
+    key = (request.GET.get('key') or '').strip()
+    nxt = (request.GET.get('next') or '').strip()
+    if key:
+        keys = _seen_activity_keys(request)
+        if key not in keys:
+            keys.append(key)
+            # Cap growth of the session list
+            request.session['seen_activity_keys'] = keys[-200:]
+            request.session.modified = True
+    if nxt.startswith('/') and not nxt.startswith('//'):
+        return redirect(nxt)
+    return redirect('activity')

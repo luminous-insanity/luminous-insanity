@@ -1,5 +1,6 @@
-from accounts.titles import available_titles, display_title
 # main/views.py
+from accounts.titles import available_titles, display_title
+
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 import logging
@@ -31,6 +32,7 @@ from django.contrib import messages
 from django.views.decorators.http import require_POST
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, render, redirect
+
 
 
 def home(request):
@@ -176,6 +178,19 @@ def leaderboard(request):
                 users=conf_users,
                 limit=50,
             )
+
+        # Same player-menu wiring as weekly/season so the board feels consistent.
+        menus = menu_data(
+            [row['user'] for row in conf_rows],
+            request.user,
+            selected_season,
+            compare_week=selected_week,
+            show_week=False,
+        )
+        for row in conf_rows:
+            menu = menus.get(row['user'].id) or {}
+            row['menu'] = menu
+            row['is_me'] = bool(menu.get('is_me'))
 
         return render(request, 'main/leaderboard.html', {
             'tab': 'confidence',
@@ -515,7 +530,6 @@ def profile(request):
     })
 
 
-
 DIVISION_CHOICES = (
     'AFC East', 'AFC North', 'AFC South', 'AFC West',
     'NFC East', 'NFC North', 'NFC South', 'NFC West',
@@ -588,6 +602,7 @@ def division_leaderboard(request):
         'season_url': f'?division={division.replace(" ", "+")}&tab=season',
         'weekly_url': f'?division={division.replace(" ", "+")}&tab=weekly&week={selected_week}',
     })
+
 
 def playoffs_view(request):
     """Championship field and first-round bracket preview."""

@@ -5,10 +5,12 @@ show the same numbers.
 """
 from urllib.parse import urlencode
 
+from django.db.models import Q
 from django.urls import reverse
 
 from . import challenges as ch
 from .careerstats import career_for, career_stats
+from .models import FriendRequest
 from .ranking import format_pct
 from .standings import compute_standings
 
@@ -41,6 +43,25 @@ def menu_data(users, viewer, season, compare_week, show_week=False):
     signed_in = viewer is not None and viewer.is_authenticated
     qs = urlencode({"season": season, "week": compare_week})
 
+    # Friendship state for the viewer vs each listed player (one query).
+    friend_state = {}  # user_id -> 'friends' | 'outgoing' | 'incoming'
+    if signed_in:
+        other_ids = [u.id for u in users if u.id != viewer.id]
+        if other_ids:
+            for fr in FriendRequest.objects.filter(
+                Q(sender=viewer, receiver_id__in=other_ids)
+                | Q(receiver=viewer, sender_id__in=other_ids)
+            ).only('sender_id', 'receiver_id', 'status'):
+                if fr.status == FriendRequest.ACCEPTED:
+                    other = fr.receiver_id if fr.sender_id == viewer.id else fr.sender_id
+                    friend_state[other] = 'friends'
+                elif fr.status == FriendRequest.PENDING:
+                    if fr.sender_id == viewer.id:
+                        friend_state[fr.receiver_id] = 'outgoing'
+                    else:
+                        friend_state[fr.sender_id] = 'incoming'
+
+    login = reverse("login")
     result = {}
     for user in users:
         is_me = signed_in and user.id == viewer.id
@@ -51,16 +72,35 @@ def menu_data(users, viewer, season, compare_week, show_week=False):
             profile_url = reverse("profile")
             picks_url = f"{reverse('picks')}?{qs}"
             challenge_url = ""
+            friend_action = "none"
+            friend_url = ""
+            friend_label = ""
         else:
             profile_url = f"{reverse('player_profile', args=[user.id])}?season={season}"
             picks = f"{reverse('compare_picks', args=[user.id])}?{qs}"
             challenge = reverse("challenge_new", args=[user.id])
+            add_friend = reverse("send_friend_request", args=[user.id])
             if signed_in:
                 picks_url, challenge_url = picks, challenge
+                state = friend_state.get(user.id)
+                if state == 'friends':
+                    friend_action, friend_url, friend_label = 'friends', '', 'Friends'
+                elif state == 'outgoing':
+                    friend_action, friend_url, friend_label = 'pending', '', 'Request sent'
+                elif state == 'incoming':
+                    # They already asked you — open the requests panel on the dashboard.
+                    friend_action = 'incoming'
+                    friend_url = f"{reverse('dashboard')}?friends=requests"
+                    friend_label = 'Respond to request'
+                else:
+                    friend_action, friend_url, friend_label = 'add', add_friend, 'Add friend'
             else:
-                login = reverse("login")
                 picks_url = f"{login}?{urlencode({'next': picks})}"
                 challenge_url = f"{login}?{urlencode({'next': challenge})}"
+                # After login, land on dashboard friends — POST is required to send a request.
+                friend_action = 'login'
+                friend_url = f"{login}?{urlencode({'next': reverse('dashboard') + '?friends=find'})}"
+                friend_label = 'Log in to add friend'
 
         result[user.id] = {
             "username": user.username,
@@ -75,6 +115,9 @@ def menu_data(users, viewer, season, compare_week, show_week=False):
             "profile_url": profile_url,
             "picks_url": picks_url,
             "challenge_url": challenge_url,
+            "friend_action": friend_action,
+            "friend_url": friend_url,
+            "friend_label": friend_label,
         }
     return result
 

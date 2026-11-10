@@ -20,9 +20,11 @@ from .views import (
     equip_title_view,
     react_to_game,
     week_recap,
+    activity_page,
+    activity_open,
 )
-from .chat_views import chat_status, chat_poll, chat_start, chat_send
 from .share_views import share_perfect_week, share_challenge, my_share_links
+from .chat_views import chat_status, chat_poll, chat_start, chat_send
 from .challenge_views import (
     challenges,
     challenge_new,
@@ -35,6 +37,8 @@ urlpatterns = [
     path('login/', login_view, name='login'),
     path('logout/', logout_view, name='logout'),
     path('dashboard/', dashboard, name='dashboard'),
+    path('activity/', activity_page, name='activity'),
+    path('activity/open/', activity_open, name='activity_open'),
     path('alerts/read/', mark_alerts_read, name='mark_alerts_read'),
     path('achievements/', achievements_page, name='achievements'),
     path('picks/', picks, name='picks'),
@@ -68,9 +72,9 @@ urlpatterns = [
     path('share/', my_share_links, name='share_hub'),
     path('titles/equip/', equip_title_view, name='equip_title'),
     path('react/game/<str:game_id>/', react_to_game, name='react_to_game'),
+    path('recap/', week_recap, name='week_recap'),
     path('chat/status/', chat_status, name='chat_status'),
     path('chat/<str:game_id>/poll/', chat_poll, name='chat_poll'),
     path('chat/<str:game_id>/start/', chat_start, name='chat_start'),
     path('chat/<str:game_id>/send/', chat_send, name='chat_send'),
-    path('recap/', week_recap, name='week_recap'),
 ]

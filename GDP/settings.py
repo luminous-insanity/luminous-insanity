@@ -97,6 +97,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'accounts.context_processors.player_team_theme',
+                'accounts.context_processors.social_drawer',
             ],
         },
     },

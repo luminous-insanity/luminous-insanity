@@ -120,6 +120,18 @@
                         <span class="pick-score {% if game_info.score and game_info.score.home_score > game_info.score.away_score %}winning-score{% endif %}">{% if game_info.score %}{{ game_info.score.home_score }}{% endif %}</span>
                     </div>
                 </div>
+                {% if user.is_authenticated %}
+                <div class="confidence-row">
+                    <button type="button"
+                            class="xf-pick-aim live-chat-btn"
+                            data-open-live-chat
+                            data-game-id="{{ game_info.game.game_id }}"
+                            data-game-label="{{ game_info.game.away_team }} @ {{ game_info.game.home_team }}"
+                            {% if team_theme.enabled %}style="background: {{ team_theme.primary }}; color: {{ team_theme.on_primary }}; border-color: {{ team_theme.primary }};"{% endif %}>
+                        Live Chat
+                    </button>
+                </div>
+                {% endif %}
             {% endif %}
 
             {% if not game_info.pick_team %}
@@ -369,6 +381,26 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
 });
+</script>
+
+
+<script>
+(function () {
+    document.querySelectorAll('[data-open-live-chat]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var gameId = btn.getAttribute('data-game-id');
+            var label = btn.getAttribute('data-game-label') || '';
+            if (window.GDPActivateSocialSection) window.GDPActivateSocialSection('live');
+            if (window.GDPOpenSocialDrawer) window.GDPOpenSocialDrawer();
+            document.dispatchEvent(new CustomEvent('gdp:open-chat', {
+                detail: { gameId: gameId, label: label }
+            }));
+            if (window.GDPChat && typeof window.GDPChat.open === 'function') {
+                window.GDPChat.open(gameId, label);
+            }
+        });
+    });
+})();
 </script>
 
 {% endblock %}

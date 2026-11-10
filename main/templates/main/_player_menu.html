@@ -35,6 +35,13 @@
         <a id="pm-profile" class="player-menu-item" href="#">View Profile</a>
         <a id="pm-picks" class="player-menu-item" href="#">View Picks</a>
         <a id="pm-challenge" class="player-menu-item" href="#">Challenge to Head-to-Head</a>
+        {# Friend actions: Add friend (POST form), status labels, or respond link #}
+        <form id="pm-friend-form" method="post" action="#" class="player-menu-item player-menu-friend-form" hidden>
+            {% csrf_token %}
+            <button type="submit" id="pm-friend-submit" class="player-menu-item-btn">Add friend</button>
+        </form>
+        <a id="pm-friend-link" class="player-menu-item" href="#" hidden>Add friend</a>
+        <span id="pm-friend-status" class="player-menu-item player-menu-item-muted" hidden>Friends</span>
         <button type="button" class="player-menu-close" data-menu-close>Close</button>
     </div>
 </div>

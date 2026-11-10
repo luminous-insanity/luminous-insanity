@@ -299,9 +299,58 @@
     /* ------------------------------------------------------------------ */
     /* choosing a game window                                              */
     /* ------------------------------------------------------------------ */
-    function selectGame(gameId) {
+    function ensureGameRow(gameId, label) {
+        var existing = rows.filter(function (r) { return r.dataset.gameId === gameId; })[0];
+        if (existing) return existing;
+        var list = document.getElementById('socialLiveGameList');
+        if (!list) return null;
+        var li = document.createElement('li');
+        li.className = 'live-game-row';
+        li.setAttribute('data-live-game', '');
+        li.dataset.gameId = gameId;
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'live-game-toggle';
+        btn.setAttribute('aria-expanded', 'false');
+        var line = document.createElement('strong');
+        line.setAttribute('data-game-line', '');
+        line.textContent = label || ('Game ' + gameId);
+        btn.appendChild(line);
+        var badge = document.createElement('span');
+        badge.className = 'gchat-live-badge pill pill-live';
+        badge.hidden = true;
+        badge.textContent = 'LIVE';
+        btn.appendChild(badge);
+        li.appendChild(btn);
+        list.appendChild(li);
+        rows.push(li);
+        btn.addEventListener('click', function () { selectGame(gameId); });
+        return li;
+    }
+
+    function selectGame(gameId, label) {
+        if (!gameId) return false;
         var row = rows.filter(function (r) { return r.dataset.gameId === gameId; })[0];
-        if (!row) return false;
+        if (!row) {
+            row = ensureGameRow(gameId, label);
+        }
+        if (!row) {
+            // Still allow chat without a row in the list
+            if (state.gameId === gameId) { pollNow(); return true; }
+            state.gameId = gameId;
+            state.token += 1;
+            state.cursor = null;
+            state.seen = {};
+            state.fails = 0;
+            state.live = false;
+            state.open = true;
+            log.textContent = '';
+            titleEl.textContent = label || ('Game ' + gameId);
+            panel.hidden = false;
+            applyPanelState();
+            pollNow();
+            return true;
+        }
         if (state.gameId === gameId) { pollNow(); return true; }
         state.gameId = gameId;
         state.token += 1;
@@ -318,7 +367,7 @@
             if (b) b.setAttribute('aria-pressed', String(on));
         });
         var line = row.querySelector('[data-game-line]');
-        titleEl.textContent = line ? line.textContent.replace(/\s+/g, ' ').trim() : 'Game chat';
+        titleEl.textContent = line ? line.textContent.replace(/\s+/g, ' ').trim() : (label || 'Game chat');
         panel.hidden = false;
         applyPanelState();
         pollNow();
@@ -516,11 +565,12 @@
     // Public hooks: used by the dashboard and the site-wide announcement.
     window.GDPChat = {
         isActive: isActive,
-        open: function (gameId) {
+        open: function (gameId, label) {
             started = true;
-            if (gameId && selectGame(gameId)) return;
+            if (gameId && selectGame(gameId, label)) return;
             pickDefaultGame();
-        }
+        },
+        ensureGame: ensureGameRow
     };
 
     // No background timer: polling starts only when the Live Chat drawer is active.

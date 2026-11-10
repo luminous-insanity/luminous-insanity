@@ -107,6 +107,30 @@
             el('pm-challenge').href = d.challengeUrl;
             el('pm-challenge').hidden = self;   // can't challenge yourself
 
+            // Friend row: Add friend (POST), status text, or respond / login link
+            var friendForm = el('pm-friend-form');
+            var friendLink = el('pm-friend-link');
+            var friendStatus = el('pm-friend-status');
+            if (friendForm) { friendForm.hidden = true; }
+            if (friendLink) { friendLink.hidden = true; }
+            if (friendStatus) { friendStatus.hidden = true; }
+            if (!self) {
+                var action = d.friendAction || '';
+                var label = d.friendLabel || 'Add friend';
+                if (action === 'add' && friendForm) {
+                    friendForm.action = d.friendUrl || '#';
+                    el('pm-friend-submit').textContent = label;
+                    friendForm.hidden = false;
+                } else if ((action === 'incoming' || action === 'login') && friendLink) {
+                    friendLink.href = d.friendUrl || '#';
+                    friendLink.textContent = label;
+                    friendLink.hidden = false;
+                } else if ((action === 'friends' || action === 'pending') && friendStatus) {
+                    friendStatus.textContent = label;
+                    friendStatus.hidden = false;
+                }
+            }
+
             menu.hidden = false;
             document.body.classList.add('player-menu-open');
             placePopup(row);

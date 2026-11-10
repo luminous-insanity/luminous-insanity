@@ -1,0 +1,32 @@
+{% extends 'main/base.html' %}
+
+{% block title %}Activity | GameDayPicks{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>All activity</h1>
+        <p>Friend achievements and challenge updates</p>
+    </div>
+    <a href="{% url 'dashboard' %}" class="btn btn-quiet btn-sm">Back to dashboard</a>
+</div>
+
+<section class="section">
+    {% if activity_feed %}
+        <ul class="feed">
+            {% for item in activity_feed %}
+                <li>
+                    <span class="feed-icon" aria-hidden="true">{{ item.icon }}</span>
+                    <div class="feed-copy">
+                        <p>{{ item.message }}</p>
+                        <small>{{ item.detail }} &middot; {{ item.at|timesince }} ago</small>
+                    </div>
+                    <a href="{{ item.url }}" aria-label="View related activity">View</a>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="empty">No activity yet. Add friends and play challenges to fill this feed.</p>
+    {% endif %}
+</section>
+{% endblock %}

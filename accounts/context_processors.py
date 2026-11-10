@@ -25,3 +25,47 @@ def player_team_theme(request):
             'on_primary': palette['on_primary'],
         }
     }
+
+
+def social_drawer(request):
+    """Expose the Social drawer payload on every authenticated page.
+
+    Always returns the keys the drawer template expects so missing
+    dashboard-only variables never blow up other pages.
+    """
+    user = getattr(request, 'user', None)
+    if user is None or not getattr(user, 'is_authenticated', False):
+        return {}
+
+    # Safe baseline so the template never looks up missing names.
+    baseline = {
+        'friend_query': '',
+        'friend_results': [],
+        'incoming_requests': [],
+        'friend_rows': [],
+        'invite_url': '',
+        'invite_text': '',
+        'invite_message': '',
+        'live_moments': None,
+        'shared_moment_weeks': [],
+        'shared_moment_challenges': [],
+        'social_selected_season': getattr(settings, 'NFL_SEASON', 2026),
+        'social_mission_week': 1,
+        'social_reaction_week': 1,
+        'social_record_week': 'season',
+        'reaction_choices': [],
+    }
+    try:
+        from .live_features import social_drawer_context
+        from .models import PerformanceReaction
+        data = social_drawer_context(request) or {}
+        baseline.update(data)
+        if not baseline.get('reaction_choices'):
+            baseline['reaction_choices'] = PerformanceReaction.choices
+    except Exception:
+        try:
+            from .models import PerformanceReaction
+            baseline['reaction_choices'] = PerformanceReaction.choices
+        except Exception:
+            pass
+    return baseline
