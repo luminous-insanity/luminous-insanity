@@ -28,6 +28,10 @@ class Standing:
     rank: int = 0               # shared on ties: 1, 1, 3
     movement_kind: str = ""     # Weekly only: up / down / same / new / none
     movement_label: str = ""
+    # Weekly only, set when "The Score is Right" separated players who were
+    # level on wins, losses and ties (see accounts/tiebreaker.py).
+    tiebreak_guess: int = None
+    tiebreak_label: str = ""
 
     @property
     def completed(self):

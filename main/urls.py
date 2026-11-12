@@ -3,7 +3,7 @@
 from django.urls import path
 from .views import (
     home, leaderboard, player_profile, react_to_performance, compare_picks, history_view, profile, division_leaderboard,
-    about, contact, privacy, terms, playoffs_view, squares_view
+    about, contact, privacy, terms, playoffs_view, squares_view, download
 )
 from accounts.chat_views import chat_status
 
@@ -19,6 +19,7 @@ urlpatterns = [
     path('history/', history_view, name='history'),
     path('profile/', profile, name='profile'),
     path('about/', about, name='about'),
+    path('download/', download, name='download'),
     path('contact/', contact, name='contact'),
     path('privacy/', privacy, name='privacy'),
     path('terms/', terms, name='terms'),

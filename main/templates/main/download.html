@@ -1,0 +1,57 @@
+{% extends 'main/base.html' %}
+{% load static %}
+
+{% block title %}Get the App — GameDayPicks{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <div class="hero-landing">
+        <h1>GameDayPicks<br>on your phone.</h1>
+        <p>Make picks, check the leaderboard, and stay in the race — right from your Android device.</p>
+        <div class="hero-cta">
+            <a href="{% static 'app/GameDayPicks.apk' %}" class="btn btn-red" download>
+                Download for Android
+            </a>
+            <a href="{% url 'home' %}" class="btn btn-quiet">Back to site</a>
+        </div>
+    </div>
+</section>
+
+<div class="feature-grid" style="margin-top: 28px;">
+    <div class="feature-card">
+        <div class="icon">📱</div>
+        <h3>Native Android app</h3>
+        <p>Built with Flutter. Fast, offline-friendly where it counts, and designed to feel like part of GameDayPicks.</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">🔒</div>
+        <h3>Same account</h3>
+        <p>Log in with the same username or Google account you already use on the website. No second profile.</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">⚡</div>
+        <h3>Picks &amp; live feel</h3>
+        <p>Weekly picks, confidence points, leaderboards, friends, and reminders — all in your pocket.</p>
+    </div>
+</div>
+
+<section class="section" style="margin-top: 40px;">
+    <div class="section-head">
+        <h2>How to install</h2>
+    </div>
+
+    <div class="tiles" style="grid-template-columns: 1fr;">
+        <article class="tile" style="padding: 20px 22px;">
+            <ol style="margin: 0; padding-left: 1.2em; line-height: 1.7;">
+                <li>Tap <strong>Download for Android</strong> above.</li>
+                <li>When Android asks, allow installs from this source (your browser).</li>
+                <li>Open the downloaded file and tap <strong>Install</strong>.</li>
+                <li>If Play Protect shows a warning, choose <strong>Install anyway</strong> — this is normal for apps not from the Play Store.</li>
+            </ol>
+            <p style="margin: 16px 0 0; color: var(--muted); font-size: 0.95rem;">
+                The app is signed and built by GameDayPicks. It is not currently on the Google Play Store.
+            </p>
+        </article>
+    </div>
+</section>
+{% endblock %}

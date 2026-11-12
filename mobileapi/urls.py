@@ -1,5 +1,5 @@
 from django.urls import path
-from . import auth, games, social, features, competitions, relay, pages
+from . import auth, games, social, features, competitions, relay, pages, extras
 
 app_name = 'mobileapi'
 
@@ -37,4 +37,14 @@ urlpatterns = [
     path('playoffs/', pages.PlayoffsView.as_view(), name='playoffs'),
     path('squares/', pages.SquaresView.as_view(), name='squares'),
     path('live-moments/', pages.LiveMomentsView.as_view(), name='live-moments'),
+    path('leagues/', extras.LeaguesView.as_view(), name='api-leagues'),
+    path('leagues/join/', extras.LeagueJoinView.as_view(), name='api-league-join'),
+    path('leagues/<int:league_id>/', extras.LeagueDetailView.as_view(), name='api-league-detail'),
+    path('leagues/<int:league_id>/action/', extras.LeagueActionView.as_view(), name='api-league-action'),
+    path('tiebreaker/', extras.TiebreakerView.as_view(), name='api-tiebreaker'),
+    path('insights/', extras.InsightsView.as_view(), name='api-insights'),
+    path('matchups/', extras.MatchupsView.as_view(), name='api-matchups'),
+    path('games/<str:game_id>/matchup/', extras.GameMatchupView.as_view(), name='api-game-matchup'),
+    path('chat/report/', extras.ChatReportView.as_view(), name='api-chat-report'),
+    path('chat/blocks/', extras.ChatBlockView.as_view(), name='api-chat-blocks'),
 ]

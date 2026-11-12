@@ -1,0 +1,55 @@
+{% extends 'main/base.html' %}
+
+{% block title %}Private leagues | GameDayPicks{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Private leagues</h1>
+        <p>Your own leaderboard for a group of friends, family or coworkers.</p>
+    </div>
+</div>
+
+{% if leagues %}
+    <ol class="lb-list">
+        {% for league in leagues %}
+            <li>
+                <a class="lb-item" href="{% url 'league_detail' league.pk %}">
+                    <span class="lb-name">{{ league.name }}{% if league.is_owner %} <em class="you-tag">Owner</em>{% endif %}</span>
+                    <span class="lb-record">
+                        <strong>{{ league.members }} player{{ league.members|pluralize }}</strong>
+                        <small>{% if league.is_open %}Open to join{% else %}Closed{% endif %}</small>
+                    </span>
+                </a>
+            </li>
+        {% endfor %}
+    </ol>
+{% else %}
+    <div class="empty">
+        <p>You're not in a league yet.</p>
+        <p>Start one below, or enter an invite code from a friend.</p>
+    </div>
+{% endif %}
+
+<section class="card form" aria-labelledby="join-title">
+    <h2 id="join-title">Join with an invite code</h2>
+    <form method="post" action="{% url 'league_join' %}" class="inline-form">
+        {% csrf_token %}
+        <label for="join-code" class="visually-hidden">Invite code</label>
+        <input id="join-code" name="code" value="{{ join_code }}" maxlength="12" autocomplete="off"
+               autocapitalize="characters" placeholder="Invite code" required>
+        <button type="submit" class="btn btn-red btn-sm">Join</button>
+    </form>
+</section>
+
+<section class="card form" aria-labelledby="create-title">
+    <h2 id="create-title">Start a league</h2>
+    <form method="post" action="{% url 'league_create' %}" class="inline-form">
+        {% csrf_token %}
+        <label for="league-name" class="visually-hidden">League name</label>
+        <input id="league-name" name="name" maxlength="60" placeholder="League name" required>
+        <button type="submit" class="btn btn-red btn-sm">Create</button>
+    </form>
+    <p class="muted">You can run up to {{ max_owned }} leagues, with up to {{ max_members }} players each.</p>
+</section>
+{% endblock %}

@@ -19,6 +19,7 @@ from api.services import MAX_WEEK, current_week
 from .models import ChampionRevealSeen, FriendRequest, Pick, UserActivity
 from .ranking import assign_ranks, format_pct, movement, record_gap
 from .standings import compute_standings, standing_for
+from .tiebreaker import apply_weekly_tiebreaker
 
 FILTER_ALL = "all"
 FILTER_FRIENDS = "friends"
@@ -175,6 +176,7 @@ def previous_week_ranks(users, season, week):
     rows = [r for r in compute_standings(week=week - 1, season=season, users=users)
             if r.completed > 0]
     assign_ranks(rows)
+    rows = apply_weekly_tiebreaker(rows, season, week - 1)
     return {r.user.id: r.rank for r in rows}
 
 
@@ -240,6 +242,9 @@ def build_board(*, tab, season, week, mode, viewer, division=None):
         users=users, with_pending=True)
 
     if weekly:
+        # "The Score is Right": separates players level on W-L-T once the
+        # week's tiebreaker game is final and someone guessed. No-op otherwise.
+        rows = apply_weekly_tiebreaker(rows, season, week)
         previous = previous_week_ranks(users, season, week)
         for row in rows:
             row.movement_kind, row.movement_label = movement(

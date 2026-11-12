@@ -155,6 +155,9 @@
                  data-poll-url="{% url 'chat_poll' '__GAME__' %}"
                  data-send-url="{% url 'chat_send' '__GAME__' %}"
                  data-start-url="{% url 'chat_start' '__GAME__' %}"
+                 data-report-url="{% url 'chat_report' %}"
+                 data-block-url="{% url 'chat_block' %}"
+                 data-blocks-url="{% url 'chat_blocks' %}"
                  data-initial-game="{{ request.GET.chat|default:'' }}">
             {% if live_moments and live_moments.live_games %}
             <ul class="live-game-list" id="socialLiveGameList">

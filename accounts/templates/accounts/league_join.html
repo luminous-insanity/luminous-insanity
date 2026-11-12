@@ -1,0 +1,21 @@
+{% extends 'main/base.html' %}
+
+{% block title %}Join {{ league.name }} | GameDayPicks{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Join {{ league.name }}?</h1>
+        <p>Run by {{ league.owner.username }} · {{ members }} player{{ members|pluralize }}</p>
+    </div>
+</div>
+
+<section class="card form">
+    <p>You'll appear on this league's leaderboard. Your picks and record are the same everywhere; a league just shows the group's standings.</p>
+    <form method="post">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-red">Join league</button>
+        <a href="{% url 'leagues' %}" class="btn btn-quiet">Not now</a>
+    </form>
+</section>
+{% endblock %}

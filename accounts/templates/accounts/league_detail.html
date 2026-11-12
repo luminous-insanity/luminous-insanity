@@ -1,0 +1,159 @@
+{% extends 'main/base.html' %}
+
+{% block title %}{{ league.name }} | GameDayPicks{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>{{ league.name }}</h1>
+        <p>{{ rows|length }} player{{ rows|length|pluralize }} · {{ selected_season }} season ·
+            <a href="{% url 'leagues' %}">All leagues</a></p>
+    </div>
+</div>
+
+<div class="lb-controls" style="justify-content:center;gap:12px 18px">
+    <div class="seg" role="tablist" aria-label="League view">
+        <a href="?tab=weekly&amp;season={{ selected_season }}&amp;week={{ selected_week }}" role="tab"
+           class="{% if tab == 'weekly' %}is-active{% endif %}">Weekly</a>
+        <a href="?tab=season&amp;season={{ selected_season }}" role="tab"
+           class="{% if tab == 'season' %}is-active{% endif %}">Season</a>
+    </div>
+
+    <form method="get" class="inline-form">
+        <input type="hidden" name="tab" value="{{ tab }}">
+        {% if tab == 'weekly' %}<input type="hidden" name="week" value="{{ selected_week }}">{% endif %}
+        <label for="season" class="visually-hidden">Season</label>
+        <select name="season" id="season" onchange="this.form.submit()">
+            {% for season in seasons %}
+                <option value="{{ season }}" {% if selected_season == season %}selected{% endif %}>{{ season }} season</option>
+            {% endfor %}
+        </select>
+    </form>
+
+    {% if tab == 'weekly' %}
+    <form method="get" class="inline-form">
+        <input type="hidden" name="tab" value="weekly">
+        <input type="hidden" name="season" value="{{ selected_season }}">
+        <label for="week" class="visually-hidden">Week</label>
+        <select name="week" id="week" onchange="this.form.submit()">
+            {% for week in weeks %}
+                <option value="{{ week }}" {% if selected_week == week %}selected{% endif %}>Week {{ week }}</option>
+            {% endfor %}
+        </select>
+    </form>
+    {% endif %}
+</div>
+
+{% if rows %}
+<ol class="lb-list">
+    {% for row in rows %}
+        <li>
+            <div class="lb-item{% if row.is_me %} is-me{% endif %}">
+                <span class="lb-rank{% if row.rank == 1 %} is-gold{% elif row.rank == 2 %} is-silver{% elif row.rank == 3 %} is-bronze{% endif %}">{{ row.rank }}</span>
+                <span class="lb-name">{{ row.user.username }}{% if row.is_me %} <em class="you-tag">You</em>{% endif %}{% if row.is_owner %} <em class="you-tag">Owner</em>{% endif %}</span>
+                <span class="lb-record">
+                    <strong>{{ row.wins }}–{{ row.losses }}–{{ row.ties }}</strong>
+                    {% if row.pending %}<small>{{ row.pending }} pending</small>{% endif %}
+                    {% if tab == 'weekly' and row.tiebreak_label %}
+                        <small class="tb-note" title="The Score is Right tiebreaker">🎯 {{ row.tiebreak_label }}</small>
+                    {% endif %}
+                </span>
+            </div>
+        </li>
+    {% endfor %}
+</ol>
+{% else %}
+    <p class="empty" style="text-align:center">No standings for this selection yet.</p>
+{% endif %}
+
+<section class="card form" aria-labelledby="invite-title">
+    <h2 id="invite-title">Invite players</h2>
+    {% if league.is_open %}
+        <p>Code: <strong style="letter-spacing:.12em">{{ league.invite_code }}</strong></p>
+        <p class="muted" style="word-break:break-all">{{ invite_url }}</p>
+        <button type="button" class="btn btn-quiet btn-sm" data-copy="{{ invite_url }}">Copy invite link</button>
+    {% else %}
+        <p class="muted">Joining is closed. {% if is_owner %}Open it again below to invite more players.{% endif %}</p>
+    {% endif %}
+</section>
+
+<section class="card form" aria-labelledby="members-title">
+    <h2 id="members-title">Players ({{ memberships|length }} of {{ max_members }})</h2>
+    <ul class="plain-list">
+        {% for m in memberships %}
+            <li style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:6px 0">
+                <span>{{ m.user.username }}{% if m.user_id == league.owner_id %} <em class="you-tag">Owner</em>{% endif %}</span>
+                {% if is_owner and m.user_id != league.owner_id %}
+                    <form method="post" action="{% url 'league_manage' league.pk %}" onsubmit="return confirm('Remove {{ m.user.username|escapejs }} from the league?');">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="remove">
+                        <input type="hidden" name="user_id" value="{{ m.user_id }}">
+                        <button type="submit" class="btn btn-quiet btn-sm">Remove</button>
+                    </form>
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ul>
+</section>
+
+{% if is_owner %}
+<section class="card form" aria-labelledby="owner-title">
+    <h2 id="owner-title">Owner tools</h2>
+
+    <form method="post" action="{% url 'league_manage' league.pk %}" class="inline-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="rename">
+        <label for="rename" class="visually-hidden">League name</label>
+        <input id="rename" name="name" value="{{ league.name }}" maxlength="60" required>
+        <button type="submit" class="btn btn-sm">Rename</button>
+    </form>
+
+    <form method="post" action="{% url 'league_manage' league.pk %}" class="inline-form" style="margin-top:10px">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="toggle_open">
+        <button type="submit" class="btn btn-quiet btn-sm">{% if league.is_open %}Close joining{% else %}Open joining{% endif %}</button>
+    </form>
+
+    <form method="post" action="{% url 'league_manage' league.pk %}" class="inline-form" style="margin-top:10px"
+          onsubmit="return confirm('The current code and link will stop working. Continue?');">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="new_code">
+        <button type="submit" class="btn btn-quiet btn-sm">Make a new invite code</button>
+    </form>
+
+    <form method="post" action="{% url 'league_manage' league.pk %}" class="inline-form" style="margin-top:10px">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="transfer">
+        <label for="transfer" class="visually-hidden">New owner username</label>
+        <input id="transfer" name="username" placeholder="Hand league to (username)" required>
+        <button type="submit" class="btn btn-quiet btn-sm">Transfer</button>
+    </form>
+
+    <form method="post" action="{% url 'league_manage' league.pk %}" class="inline-form" style="margin-top:10px">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="delete">
+        <label for="confirm" class="visually-hidden">Type the league name to delete</label>
+        <input id="confirm" name="confirm" placeholder="Type league name to delete" autocomplete="off" required>
+        <button type="submit" class="btn btn-quiet btn-sm">Delete league</button>
+    </form>
+</section>
+{% else %}
+<form method="post" action="{% url 'league_manage' league.pk %}" style="margin-top:16px"
+      onsubmit="return confirm('Leave {{ league.name|escapejs }}?');">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="leave">
+    <button type="submit" class="btn btn-quiet btn-sm">Leave league</button>
+</form>
+{% endif %}
+
+<script>
+document.querySelectorAll('[data-copy]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        var text = btn.getAttribute('data-copy');
+        var done = function () { btn.textContent = 'Copied!'; };
+        if (navigator.clipboard) { navigator.clipboard.writeText(text).then(done); }
+        else { window.prompt('Copy this link:', text); }
+    });
+});
+</script>
+{% endblock %}

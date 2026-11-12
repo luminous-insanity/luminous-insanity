@@ -41,10 +41,10 @@ What is implemented vs partial vs future. Based on code audit, not planning note
 
 ## Not implemented (product opportunities, not bugs)
 
-- Dedicated analytics / Sentry
-- Automated DB backup job inside the app (host-level backups expected)
-- Rate limiting beyond host + sync token
-- Mobile app
+- Mobile app (API is ready; see Notes/NEW_FEATURES_LEAGUES_TIEBREAKER_MODERATION.md for the newest endpoints)
+- Reminders / push notifications, email verification (waiting on a site email)
+
+Added since: private leagues, The Score is Right tiebreaker, chat moderation, My insights, staff site analytics, Vegas odds + injuries, Sentry (opt-in), rate limiting, `backup_db` command. See Notes/NEW_FEATURES_LEAGUES_TIEBREAKER_MODERATION.md.
 
 ## Historical planning docs
 

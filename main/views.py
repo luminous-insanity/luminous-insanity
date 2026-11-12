@@ -19,6 +19,7 @@ from accounts.models import PerformanceReaction, FriendRequest, Pick, PlayerIden
 from accounts.playermenu import menu_data, stats_summary
 from accounts.ranking import format_pct
 from accounts.team_identity import TEAM_CHOICES, TEAM_DATA, team_division
+from accounts.ratelimit import ratelimit
 from accounts.views import _selected_season, get_kickoff_label
 from accounts.standings import compute_standings, standing_for
 from accounts.playoffs import division_playoff_race
@@ -631,6 +632,12 @@ def about(request):
     return render(request, 'main/about.html')
 
 
+def download(request):
+    return render(request, 'main/download.html')
+
+
+@ratelimit('contact', limit=5, window=3600, key='ip', fallback='contact',
+           message='You have sent several messages already. Please try again later.')
 def contact(request):
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()

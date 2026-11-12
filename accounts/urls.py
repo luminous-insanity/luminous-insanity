@@ -24,7 +24,16 @@ from .views import (
     activity_open,
 )
 from .share_views import share_perfect_week, share_challenge, my_share_links
-from .chat_views import chat_status, chat_poll, chat_start, chat_send
+from .chat_views import (
+    chat_status, chat_poll, chat_start, chat_send,
+    chat_report, chat_block, chat_blocks,
+)
+from .tiebreaker_views import tiebreaker_save
+from .insight_views import insights_page, site_analytics
+from .league_views import (
+    leagues_home, league_create, league_join, league_join_link,
+    league_detail, league_manage,
+)
 from .challenge_views import (
     challenges,
     challenge_new,
@@ -73,7 +82,19 @@ urlpatterns = [
     path('titles/equip/', equip_title_view, name='equip_title'),
     path('react/game/<str:game_id>/', react_to_game, name='react_to_game'),
     path('recap/', week_recap, name='week_recap'),
+    path('tiebreaker/<str:game_id>/', tiebreaker_save, name='tiebreaker_save'),
+    path('insights/', insights_page, name='insights'),
+    path('staff/analytics/', site_analytics, name='site_analytics'),
+    path('leagues/', leagues_home, name='leagues'),
+    path('leagues/new/', league_create, name='league_create'),
+    path('leagues/join/', league_join, name='league_join'),
+    path('leagues/join/<str:code>/', league_join_link, name='league_join_link'),
+    path('leagues/<int:league_id>/', league_detail, name='league_detail'),
+    path('leagues/<int:league_id>/manage/', league_manage, name='league_manage'),
     path('chat/status/', chat_status, name='chat_status'),
+    path('chat/report/', chat_report, name='chat_report'),
+    path('chat/block/', chat_block, name='chat_block'),
+    path('chat/blocks/', chat_blocks, name='chat_blocks'),
     path('chat/<str:game_id>/poll/', chat_poll, name='chat_poll'),
     path('chat/<str:game_id>/start/', chat_start, name='chat_start'),
     path('chat/<str:game_id>/send/', chat_send, name='chat_send'),

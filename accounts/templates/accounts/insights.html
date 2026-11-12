@@ -1,0 +1,88 @@
+{% extends 'main/base.html' %}
+
+{% block title %}My insights | GameDayPicks{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>My insights</h1>
+        <p>How your picks have really performed in {{ selected_season }}.</p>
+    </div>
+    <form method="get" class="inline-form">
+        <label for="season" class="visually-hidden">Season</label>
+        <select name="season" id="season" onchange="this.form.submit()">
+            {% for season in seasons %}
+                <option value="{{ season }}" {% if selected_season == season %}selected{% endif %}>{{ season }} season</option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+
+{% if not insights.overall.games %}
+    <div class="empty">
+        <p>No graded picks yet for {{ selected_season }}.</p>
+        <p>Once games you picked are final, your habits will show up here.</p>
+        <a href="{% url 'picks' %}" class="btn btn-sm">Make picks</a>
+    </div>
+{% else %}
+
+<div class="stat-grid stat-grid-3">
+    <div class="stat"><span class="stat-num">{{ insights.overall.wins }}–{{ insights.overall.losses }}–{{ insights.overall.ties }}</span><span class="stat-label">Record</span></div>
+    <div class="stat"><span class="stat-num">{{ insights.overall.pct }}%</span><span class="stat-label">Accuracy</span></div>
+    <div class="stat"><span class="stat-num">{{ insights.overall.games }}</span><span class="stat-label">Graded picks</span></div>
+</div>
+
+<section class="card ins-card" aria-labelledby="ins-notes">
+    <h2 id="ins-notes">What stands out</h2>
+    <ul class="ins-notes">
+        {% for note in insights.takeaways %}<li>{{ note }}</li>{% endfor %}
+    </ul>
+</section>
+
+<section class="card ins-card" aria-labelledby="ins-side">
+    <h2 id="ins-side">Home or road?</h2>
+    {% include 'accounts/_stat_row.html' with label='Home teams' s=insights.home_vs_away.home %}
+    {% include 'accounts/_stat_row.html' with label='Road teams' s=insights.home_vs_away.away %}
+</section>
+
+<section class="card ins-card" aria-labelledby="ins-role">
+    <h2 id="ins-role">Favorites or underdogs?</h2>
+    {% include 'accounts/_stat_row.html' with label='Favorites' s=insights.favorite_vs_underdog.favorite %}
+    {% include 'accounts/_stat_row.html' with label='Underdogs' s=insights.favorite_vs_underdog.underdog %}
+    <p class="muted">Favorites are set by the Vegas line when we have one, otherwise by each team's record going into that week.</p>
+</section>
+
+<section class="card ins-card" aria-labelledby="ins-conf">
+    <h2 id="ins-conf">Does confidence pay off?</h2>
+    {% for c in insights.confidence %}
+        {% include 'accounts/_stat_row.html' with label=c.label s=c %}
+    {% endfor %}
+</section>
+
+<section class="card ins-card" aria-labelledby="ins-crowd">
+    <h2 id="ins-crowd">With or against the crowd?</h2>
+    {% include 'accounts/_stat_row.html' with label='With the majority' s=insights.with_vs_against_crowd.with %}
+    {% include 'accounts/_stat_row.html' with label='Against the majority' s=insights.with_vs_against_crowd.against %}
+    <p class="muted">Games where at least three players picked and the site wasn't split evenly.</p>
+</section>
+
+{% if insights.teams %}
+<section class="card ins-card" aria-labelledby="ins-teams">
+    <h2 id="ins-teams">Your picks by team</h2>
+    <div class="ins-table" role="table" aria-label="Record by team picked">
+        {% for t in insights.teams %}
+            {% include 'accounts/_stat_row.html' with label=t.team s=t %}
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
+<section class="card ins-card" aria-labelledby="ins-weeks">
+    <h2 id="ins-weeks">Week by week</h2>
+    {% for w in insights.weeks %}
+        {% include 'accounts/_stat_row.html' with label=w.week s=w %}
+    {% endfor %}
+</section>
+
+{% endif %}
+{% endblock %}

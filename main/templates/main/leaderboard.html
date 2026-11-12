@@ -213,6 +213,9 @@
                         {% elif standing.pending %}
                             <small>{{ standing.pending }} pending</small>
                         {% endif %}
+                        {% if tab == 'weekly' and standing.tiebreak_label %}
+                            <small class="tb-note" title="The Score is Right tiebreaker">🎯 {{ standing.tiebreak_label }}</small>
+                        {% endif %}
                     </span>
                 </button>
             </li>

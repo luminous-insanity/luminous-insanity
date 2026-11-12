@@ -1,0 +1,8 @@
+{# One accuracy line: label, record and a bar. Pass `label` and `s` (a stats dict). #}
+<div class="ins-row">
+    <span class="ins-label">{{ label }}</span>
+    <span class="ins-bar" role="img" aria-label="{{ label }}: {% if s.pct is not None %}{{ s.pct }} percent{% else %}no picks yet{% endif %}">
+        <span style="width: {% if s.pct is not None %}{{ s.pct }}{% else %}0{% endif %}%"></span>
+    </span>
+    <span class="ins-num">{% if s.games %}{{ s.wins }}–{{ s.losses }}–{{ s.ties }} <small>{{ s.pct }}%</small>{% else %}<small>no picks yet</small>{% endif %}</span>
+</div>

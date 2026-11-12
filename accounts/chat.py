@@ -19,6 +19,7 @@ from django.db import transaction
 from django.db.models import Max, Q
 from django.utils import timezone
 
+from . import moderation
 from .models import FriendRequest, GameReaction, LiveChatMessage, LiveChatRoom
 from .team_identity import team_palette
 
@@ -118,10 +119,22 @@ def visible_messages(room, user):
     follow the player between rooms). Whispers between other people never
     match, so they can never reach another player.
     """
-    return LiveChatMessage.objects.filter(is_hidden=False).filter(
+    qs = LiveChatMessage.objects.filter(is_hidden=False).filter(
         (Q(room=room) & ~Q(kind=LiveChatMessage.WHISPER))
         | (Q(kind=LiveChatMessage.WHISPER) & (Q(author=user) | Q(recipient=user)))
-    ).select_related('author', 'author__player_identity', 'recipient')
+    )
+    return _without_muted(qs, user).select_related(
+        'author', 'author__player_identity', 'recipient')
+
+
+def _without_muted(qs, user):
+    """Drop lines from players `user` muted (public) or blocked (public + whispers)."""
+    muted, blocked = moderation.block_sets(user)
+    if muted:
+        qs = qs.exclude(Q(author_id__in=muted) & ~Q(kind=LiveChatMessage.WHISPER))
+    if blocked:
+        qs = qs.exclude(kind=LiveChatMessage.WHISPER, author_id__in=blocked)
+    return qs
 
 
 # --------------------------------------------------------------------------
@@ -147,9 +160,9 @@ def poll(game, user, after=None, now=None):
     }
     if room is None:
         # No room yet: the only thing that can be waiting is a whisper.
-        qs = LiveChatMessage.objects.filter(
+        qs = _without_muted(LiveChatMessage.objects.filter(
             is_hidden=False, kind=LiveChatMessage.WHISPER,
-        ).filter(Q(author=user) | Q(recipient=user)).select_related(
+        ).filter(Q(author=user) | Q(recipient=user)), user).select_related(
             'author', 'author__player_identity', 'recipient')
     else:
         qs = visible_messages(room, user)
@@ -188,9 +201,9 @@ def live_status(user, whisper_after=None, now=None):
             'mine': room.started_by_id == user.id,
         })
 
-    whispers_to_me = LiveChatMessage.objects.filter(
+    whispers_to_me = _without_muted(LiveChatMessage.objects.filter(
         is_hidden=False, kind=LiveChatMessage.WHISPER, recipient=user,
-    )
+    ), user)
     cursor = whispers_to_me.aggregate(m=Max('id'))['m'] or 0
     new = []
     if whisper_after is not None:
@@ -262,6 +275,11 @@ def post_message(game, user, body='', kind=LiveChatMessage.SAY, to=None, emoji=N
                     LiveChatMessage.REACT, LiveChatMessage.WHISPER):
         raise ChatError('Unknown message type.')
 
+    try:
+        moderation.check_can_post(user, now)      # timed-out players stay silent
+    except moderation.ModerationBlocked as exc:
+        raise ChatError(exc.message, exc.status)
+
     recipient = None
     if kind == LiveChatMessage.REACT:
         if emoji not in dict(GameReaction.choices):
@@ -273,6 +291,10 @@ def post_message(game, user, body='', kind=LiveChatMessage.SAY, to=None, emoji=N
             raise ChatError('Type something first.')
         if len(body) > MAX_LEN:
             raise ChatError(f'Messages are limited to {MAX_LEN} characters.')
+        try:
+            body = moderation.screen_body(user, body, now)
+        except moderation.ModerationBlocked as exc:
+            raise ChatError(exc.message, exc.status)
 
     if kind == LiveChatMessage.WHISPER:
         name = clean_text(to)
@@ -283,6 +305,10 @@ def post_message(game, user, body='', kind=LiveChatMessage.SAY, to=None, emoji=N
             raise ChatError(f'No friend named {name}.', status=404)
         if recipient.id not in friend_ids(user):
             raise ChatError('You can only whisper to friends.', status=403)
+        try:
+            moderation.check_whisper_allowed(user, recipient)
+        except moderation.ModerationBlocked as exc:
+            raise ChatError(exc.message, exc.status)
 
     _check_rate_limit(user, now)
     if kind == LiveChatMessage.WHISPER:

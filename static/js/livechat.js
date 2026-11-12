@@ -110,9 +110,64 @@
         return node;
     }
 
+    var REPORT_REASONS = [
+        ['harassment', 'Harassment or bullying'],
+        ['hate', 'Hate speech'],
+        ['threat', 'Threats'],
+        ['sexual', 'Sexual content'],
+        ['spam', 'Spam or scam'],
+        ['other', 'Something else']
+    ];
+
+    function openReportForm(line, msg) {
+        // One small inline form under the line: pick a reason, send.
+        var existing = line.querySelector('.gchat-report-form');
+        if (existing) { existing.remove(); return; }
+        var form = el('span', 'gchat-report-form');
+        var select = el('select', 'gchat-report-reason');
+        select.setAttribute('aria-label', 'Reason for report');
+        REPORT_REASONS.forEach(function (r) {
+            var o = el('option', null, r[1]);
+            o.value = r[0];
+            select.appendChild(o);
+        });
+        var send = el('button', 'btn btn-sm', 'Report');
+        send.type = 'button';
+        var cancel = el('button', 'btn btn-quiet btn-sm', 'Cancel');
+        cancel.type = 'button';
+        cancel.addEventListener('click', function () { form.remove(); });
+        send.addEventListener('click', function () {
+            send.disabled = true;
+            post(root.dataset.reportUrl, {
+                message_id: msg.id, reason: select.value
+            }).then(function (data) {
+                form.remove();
+                addLocal(data.message || 'Thanks. Staff will review this report.', 'system');
+            }).catch(function (err) {
+                send.disabled = false;
+                addLocal(err.message, 'error');
+            });
+        });
+        form.appendChild(select);
+        form.appendChild(send);
+        form.appendChild(cancel);
+        line.appendChild(form);
+    }
+
+    function addReportButton(line, msg) {
+        if (msg.mine || !root.dataset.reportUrl) return;
+        var btn = el('button', 'gchat-report', '\u2691');
+        btn.type = 'button';
+        btn.title = 'Report this message';
+        btn.setAttribute('aria-label', 'Report this message');
+        btn.addEventListener('click', function () { openReportForm(line, msg); });
+        line.appendChild(btn);
+    }
+
     function renderMessage(msg) {
         var line = el('div', 'gchat-line gchat-' + msg.kind);
         if (msg.mine) line.classList.add('is-mine');
+        if (msg.author) line.dataset.author = msg.author.name.toLowerCase();
         var time = el('span', 'gchat-time', clock(msg.ts));
         line.appendChild(time);
 
@@ -142,6 +197,7 @@
                 line.appendChild(el('span', 'gchat-pre', ' whispers: '));
             }
             line.appendChild(el('span', 'gchat-text', msg.body));
+            addReportButton(line, msg);
             return line;
         }
 
@@ -166,6 +222,7 @@
             line.appendChild(el('span', 'gchat-colon', ': '));
             line.appendChild(el('span', 'gchat-text', msg.body));
         }
+        if (msg.kind === 'say' || msg.kind === 'emote') addReportButton(line, msg);
         return line;
     }
 
@@ -449,8 +506,31 @@
             '/me <action>  emote',
             '/s <message>  say to the room',
             '/friends  list your friends     /clear  clear this window',
+            '/mute <name>  hide a player\u2019s lines     /unmute <name>',
+            '/block <name>  hide lines and refuse whispers     /unblock <name>',
+            '/blocked  list who you have muted or blocked',
+            'Tap the \u2691 on a line to report it to the moderators.',
             'Tip: tap a friend\u2019s name to whisper them. ★ marks friends.'
         ].forEach(function (t) { addLocal(t, 'system'); });
+    }
+
+    function moderate(action, name) {
+        return post(root.dataset.blockUrl, { action: action, username: name }).then(function (data) {
+            addLocal(data.message || 'Done.', 'system');
+            if (action === 'mute' || action === 'block') {
+                // Clear what is already on screen from that player.
+                var who = name.toLowerCase();
+                Array.prototype.slice.call(log.querySelectorAll('.gchat-line')).forEach(function (line) {
+                    if (line.dataset.author !== who) return;
+                    if (action === 'mute' && line.classList.contains('gchat-whisper')) return;
+                    line.remove();
+                });
+            }
+            return true;
+        }).catch(function (err) {
+            addLocal(err.message, 'error');
+            return false;
+        });
     }
 
     function runCommand(text) {
@@ -482,6 +562,20 @@
                 if (!parts) { addLocal('Usage: /w <friend> <message>', 'error'); return Promise.resolve(false); }
                 if (!parts[2].trim()) { setWhisper(parts[1]); return Promise.resolve(true); }
                 return send({ kind: 'whisper', to: parts[1], body: parts[2].trim() });
+            case 'mute': case 'unmute': case 'block': case 'unblock':
+                if (!rest) { addLocal('Usage: /' + cmd + ' <name>', 'error'); return Promise.resolve(false); }
+                return moderate(cmd, rest.split(/\s+/)[0]);
+            case 'blocked': case 'muted': case 'ignored':
+                return fetch(root.dataset.blocksUrl, {
+                    credentials: 'same-origin', cache: 'no-store',
+                    headers: { 'Accept': 'application/json' }
+                }).then(function (resp) { return resp.json(); }).then(function (data) {
+                    var list = data.blocks || [];
+                    addLocal(list.length
+                        ? 'Muted or blocked: ' + list.map(function (b) { return b.username + ' (' + b.kind + ')'; }).join(', ')
+                        : 'You have not muted or blocked anyone.', 'system');
+                    return true;
+                }).catch(function () { addLocal('Could not load the list.', 'error'); return false; });
             default:
                 addLocal('Unknown command. Type /help.', 'error');
                 return Promise.resolve(false);

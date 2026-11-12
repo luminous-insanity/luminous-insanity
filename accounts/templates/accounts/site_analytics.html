@@ -1,0 +1,75 @@
+{% extends 'main/base.html' %}
+
+{% block title %}Site analytics | GameDayPicks{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Site analytics</h1>
+        <p>{{ season }} season · staff only · updated {{ generated_at|date:"M j, g:i a" }}</p>
+    </div>
+</div>
+
+<div class="stat-grid">
+    <div class="stat"><span class="stat-num">{{ totals.players }}</span><span class="stat-label">Players</span></div>
+    <div class="stat"><span class="stat-num">{{ totals.active_7d }}</span><span class="stat-label">Active, 7 days</span></div>
+    <div class="stat"><span class="stat-num">{{ totals.active_30d }}</span><span class="stat-label">Active, 30 days</span></div>
+    <div class="stat"><span class="stat-num">{{ totals.new_7d }}</span><span class="stat-label">New, 7 days</span></div>
+    <div class="stat"><span class="stat-num">{{ totals.new_30d }}</span><span class="stat-label">New, 30 days</span></div>
+    <div class="stat"><span class="stat-num">{{ totals.never_picked_over_7d }}</span><span class="stat-label">Signed up, never picked</span></div>
+</div>
+
+<section class="card ins-card" aria-labelledby="a-funnel">
+    <h2 id="a-funnel">Where players drop off</h2>
+    {% for step in funnel %}
+        <div class="ins-row">
+            <span class="ins-label">{{ step.label }}</span>
+            <span class="ins-bar"><span style="width: {% if step.share is not None %}{{ step.share }}{% else %}0{% endif %}%"></span></span>
+            <span class="ins-num">{{ step.count }} <small>{% if step.share is not None %}{{ step.share }}%{% endif %}</small></span>
+        </div>
+    {% endfor %}
+</section>
+
+<section class="card ins-card" aria-labelledby="a-signups">
+    <h2 id="a-signups">Sign-ups per week</h2>
+    {% for row in signups %}
+        <div class="ins-row">
+            <span class="ins-label">{{ row.week_of|date:"M j" }}</span>
+            <span class="ins-bar"><span style="width: {{ row.bar }}%"></span></span>
+            <span class="ins-num">{{ row.count }}</span>
+        </div>
+    {% endfor %}
+</section>
+
+<section class="card ins-card" aria-labelledby="a-weeks">
+    <h2 id="a-weeks">Players picking each week</h2>
+    {% for row in weekly %}
+        <div class="ins-row">
+            <span class="ins-label">Week {{ row.week }}</span>
+            <span class="ins-bar"><span style="width: {{ row.bar }}%"></span></span>
+            <span class="ins-num">{{ row.players }} <small>{{ row.picks }} picks{% if row.retained is not None %} · {{ row.retained }}% came back{% endif %}</small></span>
+        </div>
+    {% empty %}
+        <p class="muted">No picks in {{ season }} yet.</p>
+    {% endfor %}
+</section>
+
+<section class="card ins-card" aria-labelledby="a-chat">
+    <h2 id="a-chat">Chat and safety</h2>
+    <ul class="ins-notes">
+        <li>{{ chat.messages_7d }} chat lines from {{ chat.chatters_7d }} player{{ chat.chatters_7d|pluralize }} in the last 7 days</li>
+        <li>{{ chat.hidden_7d }} line{{ chat.hidden_7d|pluralize }} hidden in the last 7 days</li>
+        <li><a href="{% url 'admin:accounts_chatreport_changelist' %}?status__exact=open">{{ chat.open_reports }} open report{{ chat.open_reports|pluralize }}</a></li>
+        <li>{{ chat.active_timeouts }} active timeout{{ chat.active_timeouts|pluralize }}</li>
+    </ul>
+</section>
+
+<section class="card ins-card" aria-labelledby="a-social">
+    <h2 id="a-social">Social features</h2>
+    <ul class="ins-notes">
+        <li>{{ social.friendships }} friendship{{ social.friendships|pluralize }}</li>
+        <li>{{ social.leagues }} private league{{ social.leagues|pluralize }}, {{ social.players_in_a_league }} player{{ social.players_in_a_league|pluralize }} in at least one{% if social.avg_league_size %} (average size {{ social.avg_league_size }}){% endif %}</li>
+        <li>{{ social.tiebreaker_guesses }} Score is Right guess{{ social.tiebreaker_guesses|pluralize:"es" }} this season</li>
+    </ul>
+</section>
+{% endblock %}

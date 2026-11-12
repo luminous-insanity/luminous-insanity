@@ -1,6 +1,9 @@
 # picks/models.py
+import secrets
+
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
 from api.models import Game
 
 
@@ -504,3 +507,226 @@ class LiveChatMessage(models.Model):
 
     def __str__(self):
         return f'{self.author_id} [{self.kind}] {self.body[:30]}'
+
+
+# ---------------------------------------------------------------------------
+# Private leagues
+# ---------------------------------------------------------------------------
+# No 0/O/1/I/L so invite codes are easy to read aloud and type on a phone.
+LEAGUE_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
+LEAGUE_CODE_LENGTH = 8
+
+
+def new_league_code():
+    return ''.join(secrets.choice(LEAGUE_CODE_ALPHABET) for _ in range(LEAGUE_CODE_LENGTH))
+
+
+class League(models.Model):
+    """A private group with its own leaderboard.
+
+    Standings inside a league are never stored. They are worked out from the
+    same picks and final scores as the main leaderboard, limited to the
+    league's members (see accounts/leagues.py).
+    """
+    name = models.CharField(max_length=60)
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='owned_leagues')
+    invite_code = models.CharField(max_length=LEAGUE_CODE_LENGTH, unique=True, editable=False)
+    is_open = models.BooleanField(
+        default=True, help_text='When off, nobody new can join with the invite code.')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name', 'id']
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.invite_code:
+            self.invite_code = self.make_unique_code()
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def make_unique_code(cls):
+        for _ in range(20):
+            code = new_league_code()
+            if not cls.objects.filter(invite_code=code).exists():
+                return code
+        raise RuntimeError('Could not generate a unique league invite code.')
+
+    def regenerate_code(self):
+        self.invite_code = self.make_unique_code()
+        self.save(update_fields=['invite_code'])
+        return self.invite_code
+
+
+class LeagueMembership(models.Model):
+    league = models.ForeignKey(League, on_delete=models.CASCADE, related_name='memberships')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='league_memberships')
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['joined_at', 'id']
+        constraints = [
+            models.UniqueConstraint(fields=['league', 'user'], name='unique_league_member'),
+        ]
+
+    def __str__(self):
+        return f'{self.user} in {self.league}'
+
+
+# ---------------------------------------------------------------------------
+# Tiebreaker: "The Score is Right"
+# ---------------------------------------------------------------------------
+class TiebreakerGame(models.Model):
+    """Staff override for which game is a week's tiebreaker.
+
+    Without a row, the last game of the week is used (see accounts/tiebreaker.py).
+    """
+    season = models.PositiveSmallIntegerField()
+    week = models.PositiveSmallIntegerField()
+    game = models.ForeignKey(Game, on_delete=models.CASCADE, related_name='+')
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['season', 'week'], name='unique_tiebreaker_game_per_week'),
+        ]
+
+    def __str__(self):
+        return f'{self.season} week {self.week}: {self.game}'
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.game_id and (self.game.season != self.season or self.game.week != self.week):
+            raise ValidationError('The game must belong to the same season and week.')
+
+
+class TiebreakerPick(models.Model):
+    """A player's guess at the tiebreaker game's combined final score.
+
+    Closest without going over wins a tie. See accounts/tiebreaker.py.
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='tiebreaker_picks')
+    game = models.ForeignKey(Game, on_delete=models.CASCADE, related_name='tiebreaker_picks')
+    total_points = models.PositiveSmallIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'game'], name='unique_tiebreaker_pick'),
+        ]
+
+    def __str__(self):
+        return f'{self.user} guesses {self.total_points} for {self.game}'
+
+
+# ---------------------------------------------------------------------------
+# Chat moderation
+# ---------------------------------------------------------------------------
+class ChatBlock(models.Model):
+    """One player muting or blocking another in live chat.
+
+    mute:  you stop seeing their public lines (they are not told).
+    block: mute, plus whispers in either direction are refused.
+    """
+    MUTE = 'mute'
+    BLOCK = 'block'
+    KIND_CHOICES = [(MUTE, 'Mute'), (BLOCK, 'Block')]
+
+    blocker = models.ForeignKey(User, on_delete=models.CASCADE, related_name='chat_blocks_made')
+    blocked = models.ForeignKey(User, on_delete=models.CASCADE, related_name='chat_blocked_by')
+    kind = models.CharField(max_length=5, choices=KIND_CHOICES, default=MUTE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['blocker', 'blocked'], name='unique_chat_block_pair'),
+            models.CheckConstraint(
+                check=~models.Q(blocker=models.F('blocked')), name='chat_block_not_self'),
+        ]
+
+    def __str__(self):
+        return f'{self.blocker} {self.kind}s {self.blocked}'
+
+
+class ChatReport(models.Model):
+    """A player reporting a chat line for staff review.
+
+    The text and room are copied onto the report, so staff can still see what
+    was said after the message is hidden.
+    """
+    HARASSMENT = 'harassment'
+    HATE = 'hate'
+    THREAT = 'threat'
+    SEXUAL = 'sexual'
+    SPAM = 'spam'
+    OTHER = 'other'
+    REASON_CHOICES = [
+        (HARASSMENT, 'Harassment or bullying'),
+        (HATE, 'Hate speech'),
+        (THREAT, 'Threats'),
+        (SEXUAL, 'Sexual content'),
+        (SPAM, 'Spam or scam'),
+        (OTHER, 'Something else'),
+    ]
+
+    OPEN = 'open'
+    ACTIONED = 'actioned'
+    DISMISSED = 'dismissed'
+    STATUS_CHOICES = [(OPEN, 'Open'), (ACTIONED, 'Action taken'), (DISMISSED, 'Dismissed')]
+
+    reporter = models.ForeignKey(User, on_delete=models.CASCADE, related_name='chat_reports_made')
+    reported_user = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name='chat_reports_against')
+    message = models.ForeignKey(
+        LiveChatMessage, null=True, blank=True, on_delete=models.SET_NULL, related_name='reports')
+    body_snapshot = models.CharField(max_length=240, blank=True, default='')
+    game_label = models.CharField(max_length=80, blank=True, default='')
+    reason = models.CharField(max_length=12, choices=REASON_CHOICES, default=OTHER)
+    details = models.CharField(max_length=200, blank=True, default='')
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=OPEN, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    resolution = models.CharField(max_length=200, blank=True, default='')
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+        constraints = [
+            models.UniqueConstraint(fields=['reporter', 'message'], name='unique_report_per_message'),
+        ]
+
+    def __str__(self):
+        return f'Report #{self.pk}: {self.reason} ({self.status})'
+
+
+class ChatSanction(models.Model):
+    """A timeout from live chat. `until` empty means until staff lift it."""
+    STAFF = 'staff'
+    AUTO = 'auto'
+    SOURCE_CHOICES = [(STAFF, 'Staff'), (AUTO, 'Automatic')]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='chat_sanctions')
+    until = models.DateTimeField(null=True, blank=True)
+    reason = models.CharField(max_length=200, blank=True, default='')
+    source = models.CharField(max_length=5, choices=SOURCE_CHOICES, default=STAFF)
+    created_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+    created_at = models.DateTimeField(auto_now_add=True)
+    revoked = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+        indexes = [models.Index(fields=['user', 'revoked'], name='acc_sanction_user_idx')]
+
+    def __str__(self):
+        end = f'until {self.until:%Y-%m-%d %H:%M}' if self.until else 'until lifted'
+        return f'{self.user} timed out {end}'
+
+    @property
+    def is_active(self):
+        if self.revoked:
+            return False
+        return self.until is None or self.until > timezone.now()

@@ -52,6 +52,27 @@
     </div>
 </section>
 
+{% if tiebreaker %}
+<section class="card tb-card" aria-labelledby="tb-title">
+    <h2 id="tb-title">🎯 The Score is Right</h2>
+    <p class="muted">Tiebreaker for <strong>{{ tiebreaker.label }}</strong>: guess the combined final score. If players finish the week level, the closest guess <em>without going over</em> ranks higher.</p>
+    {% if tiebreaker.locked %}
+        <p>
+            {% if tiebreaker.guess is not None %}Your guess: <strong>{{ tiebreaker.guess }}</strong>{% else %}You didn't make a guess this week.{% endif %}
+            {% if tiebreaker.actual is not None %} · Final total: <strong>{{ tiebreaker.actual }}</strong>{% if tiebreaker.result %} · {{ tiebreaker.result }}{% endif %}{% else %} · Guesses are locked.{% endif %}
+        </p>
+    {% else %}
+        <form method="post" action="{% url 'tiebreaker_save' tiebreaker.game_id %}" class="inline-form">
+            {% csrf_token %}
+            <label for="tb-guess" class="visually-hidden">Combined final score guess</label>
+            <input id="tb-guess" name="total_points" type="number" inputmode="numeric" min="0" max="200"
+                   value="{{ tiebreaker.guess|default_if_none:'' }}" placeholder="Total points" required>
+            <button type="submit" class="btn btn-red btn-sm">{% if tiebreaker.guess is not None %}Update guess{% else %}Save guess{% endif %}</button>
+        </form>
+    {% endif %}
+</section>
+{% endif %}
+
 <div class="matches">
     {% for game_info in game_data %}
         <article class="match {% if game_info.kickoff_label == 'FINAL' %}is-final{% elif game_info.kickoff_label == 'IN PROGRESS' %}is-live{% endif %}">
@@ -68,6 +89,35 @@
                 {% if game_info.away_is_underdog %}<span class="pill pill-dog">{{ game_info.game.away_team }} dog</span>{% endif %}
                 {% if game_info.home_is_underdog %}<span class="pill pill-dog">{{ game_info.game.home_team }} dog</span>{% endif %}
             </div>
+
+            {% if game_info.odds and game_info.odds.spread_label or game_info.odds and game_info.odds.total_label %}
+                <p class="match-odds" aria-label="Vegas line">
+                    {% if game_info.odds.spread_label %}<span>Line <strong>{{ game_info.odds.spread_label }}</strong></span>{% endif %}
+                    {% if game_info.odds.total_label %}<span>{{ game_info.odds.total_label }}</span>{% endif %}
+                    {% if game_info.odds.moneyline_away is not None and game_info.odds.moneyline_home is not None %}
+                        <span>ML {{ game_info.game.away_team }} {{ game_info.odds.moneyline_away|stringformat:"+d" }} / {{ game_info.game.home_team }} {{ game_info.odds.moneyline_home|stringformat:"+d" }}</span>
+                    {% endif %}
+                </p>
+            {% endif %}
+            {% if game_info.home_injuries or game_info.away_injuries %}
+                <details class="match-injuries">
+                    <summary>Injury report <span class="pill">{{ game_info.injury_count }}</span></summary>
+                    <div class="injury-cols">
+                        <div>
+                            <strong>{{ game_info.game.away_team }}</strong>
+                            {% for r in game_info.away_injuries %}
+                                <p class="injury-line"><span class="injury-status injury-{{ r.status }}">{{ r.get_status_display }}</span> {{ r.player_name }}{% if r.position %} <small>{{ r.position }}</small>{% endif %}{% if r.detail %} <small>· {{ r.detail }}</small>{% endif %}</p>
+                            {% empty %}<p class="muted">None reported</p>{% endfor %}
+                        </div>
+                        <div>
+                            <strong>{{ game_info.game.home_team }}</strong>
+                            {% for r in game_info.home_injuries %}
+                                <p class="injury-line"><span class="injury-status injury-{{ r.status }}">{{ r.get_status_display }}</span> {{ r.player_name }}{% if r.position %} <small>{{ r.position }}</small>{% endif %}{% if r.detail %} <small>· {{ r.detail }}</small>{% endif %}</p>
+                            {% empty %}<p class="muted">None reported</p>{% endfor %}
+                        </div>
+                    </div>
+                </details>
+            {% endif %}
 
             {% if game_info.pick_available %}
                 <form method="post" action="{% url 'make_pick' game_info.game.game_id %}" class="match-form">

@@ -1,5 +1,7 @@
 # api/models.py
 
+from decimal import Decimal
+
 from django.db import models
 from django.utils import timezone
 
@@ -127,3 +129,133 @@ class Score(models.Model):
 
     def __str__(self):
         return f"Score for {self.game_id}: Home Score: {self.home_score}, Away Score: {self.away_score}"
+
+
+class GameOdds(models.Model):
+    """Betting line for one game (Vegas odds).
+
+    Display and analytics only. Odds never affect scoring or standings.
+    Lines are entered by hand in admin or loaded with
+    `manage.py import_matchups`, so any odds provider can feed this later.
+
+    spread_home uses the usual sportsbook sign: negative means the HOME team
+    is favored (-3.5), positive means the AWAY team is favored (+3.5).
+    """
+    game = models.OneToOneField(Game, on_delete=models.CASCADE, related_name='odds')
+    spread_home = models.DecimalField(
+        max_digits=4, decimal_places=1, null=True, blank=True,
+        help_text='Home-team spread. Negative = home favored, positive = away favored.',
+    )
+    total_points = models.DecimalField(
+        max_digits=4, decimal_places=1, null=True, blank=True,
+        help_text='Over/under for combined points.',
+    )
+    moneyline_home = models.IntegerField(null=True, blank=True)
+    moneyline_away = models.IntegerField(null=True, blank=True)
+    sportsbook = models.CharField(max_length=40, blank=True, default='')
+    source = models.CharField(max_length=20, blank=True, default='manual')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'game odds'
+        verbose_name_plural = 'game odds'
+
+    def __str__(self):
+        return f'Odds for {self.game}'
+
+    @property
+    def favorite_side(self):
+        """'home', 'away', 'pickem', or None when there is no line."""
+        if self.spread_home is not None:
+            if self.spread_home < 0:
+                return 'home'
+            if self.spread_home > 0:
+                return 'away'
+            return 'pickem'
+        if self.moneyline_home is not None and self.moneyline_away is not None:
+            if self.moneyline_home < self.moneyline_away:
+                return 'home'
+            if self.moneyline_away < self.moneyline_home:
+                return 'away'
+            return 'pickem'
+        return None
+
+    @property
+    def favorite_team(self):
+        side = self.favorite_side
+        if side == 'home':
+            return self.game.home_team
+        if side == 'away':
+            return self.game.away_team
+        return None
+
+    @property
+    def spread_label(self):
+        """'KC -3.5' (favorite and number), 'PICK' for a pick'em, '' if unknown."""
+        if self.spread_home is None:
+            return ''
+        if self.spread_home == 0:
+            return "PICK'EM"
+        points = abs(Decimal(str(self.spread_home))).normalize()
+        number = f'{points:f}'
+        favorite = self.game.home_team if self.spread_home < 0 else self.game.away_team
+        return f'{favorite} -{number}'
+
+    @property
+    def total_label(self):
+        if self.total_points is None:
+            return ''
+        return f'O/U {Decimal(str(self.total_points)).normalize():f}'
+
+
+class InjuryReport(models.Model):
+    """One player's injury designation for one team in one week.
+
+    Team uses the same abbreviation stored on Game.home_team / away_team.
+    Display only; never affects scoring.
+    """
+    OUT = 'out'
+    DOUBTFUL = 'doubtful'
+    QUESTIONABLE = 'questionable'
+    PROBABLE = 'probable'
+    IR = 'ir'
+    STATUS_CHOICES = [
+        (OUT, 'Out'),
+        (DOUBTFUL, 'Doubtful'),
+        (QUESTIONABLE, 'Questionable'),
+        (PROBABLE, 'Probable'),
+        (IR, 'Injured reserve'),
+    ]
+    # Most serious first; used to sort the list shown on the picks page.
+    SEVERITY = {IR: 0, OUT: 1, DOUBTFUL: 2, QUESTIONABLE: 3, PROBABLE: 4}
+
+    season = models.IntegerField(db_index=True)
+    week = models.IntegerField()
+    team = models.CharField(max_length=100)
+    player_name = models.CharField(max_length=80)
+    position = models.CharField(max_length=8, blank=True, default='')
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=QUESTIONABLE)
+    detail = models.CharField(max_length=120, blank=True, default='',
+                              help_text='Body part or note, e.g. "Knee".')
+    is_key_player = models.BooleanField(
+        default=False, help_text='Starter or star. Key players are listed first.')
+    source = models.CharField(max_length=20, blank=True, default='manual')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['season', 'week', 'team', 'player_name'],
+                name='unique_injury_per_player_week',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['season', 'week', 'team'], name='api_injury_szn_wk_team_idx'),
+        ]
+
+    def __str__(self):
+        return f'{self.team} {self.player_name}: {self.status} (W{self.week})'
+
+    @property
+    def severity(self):
+        return self.SEVERITY.get(self.status, 9)

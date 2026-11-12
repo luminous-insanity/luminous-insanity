@@ -29,10 +29,15 @@ from .quests import build_weekly_quests
 from .path_to_playoffs import path_to_playoffs
 from .recap import build_week_recap
 from .share_views import _week_record
+from .ratelimit import ratelimit, username_key
+from . import tiebreaker
+from api import matchups
 from relaywars.services import open_join_events
 import logging
 
 
+@ratelimit('signup', limit=10, window=3600, key='ip',
+           message='Too many sign-up attempts from this connection. Please try again later.')
 def signup_view(request):
     if request.method == 'POST':
         form = SignUpForm(request.POST)
@@ -46,6 +51,10 @@ def signup_view(request):
     return render(request, 'accounts/signup.html', {'form': form})
 
 
+@ratelimit('login_ip', limit=15, window=300, key='ip',
+           message='Too many login attempts. Please wait a few minutes and try again.')
+@ratelimit('login_name', limit=8, window=900, key=username_key(),
+           message='Too many login attempts for that account. Please wait a few minutes.')
 def login_view(request):
     if request.method == 'POST':
         form = LoginForm(data=request.POST)
@@ -430,8 +439,19 @@ def picks(request, week_number=None):
     games = (
         Game.objects
         .filter(season=selected_season, week=selected_week)
+        .select_related('odds')
         .order_by('game_date', 'kickoff', 'id')
     )
+
+    # Vegas line + injury reports are display-only context. A problem loading
+    # them must never break the picks page.
+    try:
+        week_injuries = matchups.injuries_by_team(
+            selected_season, selected_week,
+            {t for g in games for t in (g.home_team, g.away_team)})
+    except Exception:
+        logging.getLogger(__name__).exception('Could not load injury reports')
+        week_injuries = {}
 
     user_picks = {
         p.game_id: p
@@ -549,6 +569,11 @@ def picks(request, week_number=None):
             'community_home_percent': home_percent,
             'show_community_picks': bool(user_pick and community_total),
             'friend_pulse': friend_pulse,
+            'odds': getattr(game, 'odds', None),
+            'home_injuries': week_injuries.get(game.home_team, []),
+            'away_injuries': week_injuries.get(game.away_team, []),
+            'injury_count': len(week_injuries.get(game.home_team, []))
+                            + len(week_injuries.get(game.away_team, [])),
         })
 
     picked_count = sum(1 for item in game_data if item['pick_status'] in (Pick.HOME, Pick.AWAY))
@@ -563,6 +588,7 @@ def picks(request, week_number=None):
         'remaining_count': total_games - picked_count,
         'total_games': total_games,
         'pick_progress_percent': round((picked_count / total_games) * 100) if total_games else 0,
+        'tiebreaker': tiebreaker.weekly_card(request.user, selected_season, selected_week),
     }
 
     return render(request, 'accounts/picks.html', context)
@@ -611,6 +637,7 @@ def get_kickoff_label(game):
 
 @login_required
 @require_POST
+@ratelimit('make_pick', limit=120, window=60, key='user', fallback='picks')
 def make_pick(request, game_id):
     game = get_object_or_404(Game, game_id=game_id)
     back = f"{reverse('picks')}?season={game.season}&week={game.week}"
@@ -650,6 +677,7 @@ def make_pick(request, game_id):
 
 
 @login_required
+@ratelimit('friend_search', limit=60, window=60, key='user', methods=('GET',), fallback='dashboard')
 def friend_search(request):
     query = request.GET.get('q', '').strip()
     users = User.objects.none()
@@ -668,6 +696,7 @@ def friend_search(request):
 
 
 @login_required
+@ratelimit('friend_request', limit=30, window=3600, key='user', fallback='dashboard')
 def send_friend_request(request, user_id):
     def _back():
         # Prefer explicit next, then referer (leaderboard player menu), else dashboard.

@@ -1,5 +1,6 @@
 from .common import *
 from .common import _game_payload
+from api import matchups
 
 class GamesView(APIView):
     permission_classes = [IsAuthenticated]
@@ -12,11 +13,15 @@ class GamesView(APIView):
             return Response({'detail': 'Season and week must be numbers.'}, status=400)
         if not 1 <= week <= 22:
             return Response({'detail': 'Week must be between 1 and 22.'}, status=400)
-        games = Game.objects.filter(season=season, week=week).order_by('game_date', 'kickoff', 'pk')
-        return Response({
-            'season': season, 'week': week,
-            'games': [_game_payload(game, request.user, include_community=True) for game in games],
-        })
+        games = (Game.objects.filter(season=season, week=week).select_related('odds')
+                 .order_by('game_date', 'kickoff', 'pk'))
+        payloads = []
+        for game in games:
+            payload = _game_payload(game, request.user, include_community=True)
+            # Vegas line (None when not loaded). Injuries: GET /api/v1/matchups/.
+            payload['odds'] = matchups.odds_payload(getattr(game, 'odds', None))
+            payloads.append(payload)
+        return Response({'season': season, 'week': week, 'games': payloads})
 
 
 class PicksView(APIView):
