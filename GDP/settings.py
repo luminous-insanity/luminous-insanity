@@ -25,6 +25,15 @@ GOOGLE_CLIENT_SECRET = config('GOOGLE_CLIENT_SECRET')
 NFL_SEASON = config('NFL_SEASON', default=2026, cast=int)
 SYNC_TOKEN = config('SYNC_TOKEN', default='')
 
+# Game rule: when this many players or fewer are active, every active player
+# qualifies for the playoffs (the weekly cuts then keep everyone). 0 = off, i.e.
+# use the capacity algorithm in accounts/playoff_qualification.py unchanged.
+PLAYOFF_ALL_ACTIVE_MAX = config('PLAYOFF_ALL_ACTIVE_MAX', default=50, cast=int)
+
+# Push delivery. Path to the Firebase service-account JSON ON THE SERVER ONLY
+# (never in the app or a ZIP). Empty = push is a safe no-op.
+FIREBASE_ADMIN_CREDENTIALS = config('FIREBASE_ADMIN_CREDENTIALS', default='')
+
 DEBUG = config('DEBUG', default=False, cast=bool)
 
 # Comma-separated list in .env, e.g.:

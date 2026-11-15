@@ -1,4 +1,5 @@
 from .common import *
+from .push import send_user_push
 
 class RelayWarsView(APIView):
     permission_classes = [IsAuthenticated]
@@ -169,6 +170,15 @@ class RelayMatchView(APIView):
                 return Response({'detail': 'Action must be pick, skip, propose_ability, or vote.'}, status=400)
         except (ValueError, services.RelayWarsError) as exc:
             return Response({'detail': str(exc)}, status=400)
+        if action in ('pick', 'skip'):
+            from relaywars.services import draft_state
+            _turns, next_turn, _complete = draft_state(match)
+            if next_turn and next_turn.assigned_member_id != request.user.pk:
+                send_user_push(
+                    next_turn.assigned_member, 'Relay Wars: your turn',
+                    'Your team is ready for its next game pick.',
+                    preference='relay_turns', data={'type': 'relay_turn', 'match_id': str(match.pk)},
+                )
         return Response({'ok': True, **result, 'match': self._payload(match, request.user)})
 
 

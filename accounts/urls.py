@@ -23,6 +23,7 @@ from .views import (
     activity_page,
     activity_open,
 )
+from .account_views import delete_account_page
 from .share_views import share_perfect_week, share_challenge, my_share_links
 from .chat_views import (
     chat_status, chat_poll, chat_start, chat_send,
@@ -46,6 +47,7 @@ urlpatterns = [
     path('login/', login_view, name='login'),
     path('logout/', logout_view, name='logout'),
     path('dashboard/', dashboard, name='dashboard'),
+    path('delete/', delete_account_page, name='delete_account'),
     path('activity/', activity_page, name='activity'),
     path('activity/open/', activity_open, name='activity_open'),
     path('alerts/read/', mark_alerts_read, name='mark_alerts_read'),

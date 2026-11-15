@@ -1,0 +1,33 @@
+{% extends 'main/base.html' %}
+
+{% block title %}Delete account | GameDayPicks{% endblock %}
+
+{% block content %}
+<div class="stack">
+    <section class="card detail-card">
+        <div class="detail-card-head"><h2>Delete your account</h2></div>
+        <p>
+            This permanently removes your sign-in, email address, linked Google
+            account, devices, friend connections and chat text. It cannot be undone.
+        </p>
+        <p class="muted">
+            Your past picks stay in the league as an anonymous player (“deleted-…”)
+            so other players’ standings, rankings and head-to-head records are not
+            changed. A deleted account cannot enter future playoffs.
+        </p>
+        <form method="post" class="stack">
+            {% csrf_token %}
+            {% if needs_password %}
+                <label for="password">Your password</label>
+                <input id="password" type="password" name="password" autocomplete="current-password" required>
+            {% endif %}
+            <label for="confirm">Type DELETE to confirm</label>
+            <input id="confirm" type="text" name="confirm" autocomplete="off" required>
+            <div class="button-row">
+                <button type="submit" class="btn">Delete my account</button>
+                <a href="{% url 'profile' %}" class="btn btn-quiet">Cancel</a>
+            </div>
+        </form>
+    </section>
+</div>
+{% endblock %}

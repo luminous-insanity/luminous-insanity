@@ -9,6 +9,7 @@ to reason about. They are the single source of truth for:
   * when picks lock
   * which week is the "current" week
 """
+import re
 from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -132,3 +133,75 @@ def choose_current_week(games, today, stale_days=4):
     if open_weeks:
         return min(open_weeks)
     return max(week for (week, _status, _date) in games)
+
+
+# --------------------------------------------------------- quarter scores --
+# Used by Super Bowl Squares. Tank01's box score carries a per-quarter
+# "lineScore" for each side. The key spelling has not been verified against the
+# live feed from here, so several spellings are accepted; if nothing parses we
+# record nothing (admin can still enter quarter scores by hand).
+
+_QUARTER_KEYS = {
+    1: ("Q1", "q1", "1", "1Q", "1st", "1stQtr", "1stQuarter"),
+    2: ("Q2", "q2", "2", "2Q", "2nd", "2ndQtr", "2ndQuarter"),
+    3: ("Q3", "q3", "3", "3Q", "3rd", "3rdQtr", "3rdQuarter"),
+    4: ("Q4", "q4", "4", "4Q", "4th", "4thQtr", "4thQuarter"),
+}
+
+
+def _quarter_points(side, quarter):
+    """Points one side scored IN a quarter, or None when not reported."""
+    if not isinstance(side, dict):
+        return None
+    for key in _QUARTER_KEYS[quarter]:
+        if key in side:
+            value = to_int(side[key])
+            if value is not None and value >= 0:
+                return value
+    return None
+
+
+def _current_period(body):
+    """1-4 from a value such as 'Q3', '3rd' or '3'; None if unclear.
+
+    Anchored at the start on purpose: a clock like '5:00' must never be read
+    as a period, because a too-high answer could record a quarter early.
+    """
+    raw = str(body.get("currentPeriod", "")).strip()
+    match = re.match(r"^(?:q\s*)?([1-4])(?:st|nd|rd|th)?\b", raw, re.IGNORECASE)
+    return int(match.group(1)) if match else None
+
+
+def parse_quarter_scores(body, final=False):
+    """{quarter: (home_total, away_total)} for COMPLETED quarters 1-3.
+
+    Totals are cumulative (end of Q1, halftime, end of Q3), which is what
+    api.QuarterScore stores. A quarter only counts as complete once the game
+    is final, a later quarter shows points, or the feed's current period is
+    past it. A late answer is fine; an early (partial-quarter) answer would
+    pick the wrong winning square, so when unsure nothing is returned.
+    """
+    if not isinstance(body, dict):
+        return {}
+    line = body.get("lineScore")
+    if not isinstance(line, dict):
+        return {}
+    home = {q: _quarter_points(line.get("home"), q) for q in (1, 2, 3, 4)}
+    away = {q: _quarter_points(line.get("away"), q) for q in (1, 2, 3, 4)}
+    period = _current_period(body)
+
+    results = {}
+    run_home = run_away = 0
+    for quarter in (1, 2, 3):
+        if home[quarter] is None or away[quarter] is None:
+            break
+        run_home += home[quarter]
+        run_away += away[quarter]
+        later_scored = any(
+            (home[n] or 0) > 0 or (away[n] or 0) > 0 for n in range(quarter + 1, 5)
+        )
+        complete = final or later_scored or (period is not None and period > quarter)
+        if not complete:
+            break
+        results[quarter] = (run_home, run_away)
+    return results

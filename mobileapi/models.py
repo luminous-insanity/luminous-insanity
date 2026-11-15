@@ -33,7 +33,7 @@ class NotificationPreference(models.Model):
     challenges = models.BooleanField(default=True)
     whispers = models.BooleanField(default=True)
     relay_turns = models.BooleanField(default=True)
-    pick_reminders = models.BooleanField(default=False)
+    pick_reminders = models.BooleanField(default=True)
     game_results = models.BooleanField(default=False)
     crossfire_resolved = models.BooleanField(default=False)
     updated_at = models.DateTimeField(auto_now=True)
@@ -59,3 +59,21 @@ class IdempotencyRecord(models.Model):
 
     def __str__(self):
         return f'{self.user_id} · {self.key}'
+
+
+class PickReminderLog(models.Model):
+    """One row per player per season/week once the pick reminder was delivered.
+
+    Guarantees the weekly reminder is never sent twice, even if the cron runs
+    every few minutes or a kickoff moves after the reminder went out.
+    """
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='pick_reminder_logs')
+    season = models.PositiveSmallIntegerField()
+    week = models.PositiveSmallIntegerField()
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['user', 'season', 'week'], name='mobile_unique_pick_reminder')]
+
+    def __str__(self):
+        return f'{self.user_id} · {self.season} wk{self.week}'

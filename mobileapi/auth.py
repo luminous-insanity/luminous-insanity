@@ -58,6 +58,7 @@ class GoogleLoginView(APIView):
 
         from allauth.socialaccount.models import SocialAccount
         from allauth.account.models import EmailAddress
+        matched_by_email = False
         with transaction.atomic():
             social = SocialAccount.objects.select_related('user').filter(provider='google', uid=subject).first()
             email_row = EmailAddress.objects.select_related('user').filter(email__iexact=email).first()
@@ -67,8 +68,10 @@ class GoogleLoginView(APIView):
                     return Response({'detail': 'This verified email is already associated with a different account.'}, status=409)
             elif email_row:
                 user = email_row.user
+                matched_by_email = True
             else:
                 user = User.objects.filter(email__iexact=email).order_by('pk').first()
+                matched_by_email = user is not None
                 if user is None:
                     base = ''.join(ch for ch in email.split('@', 1)[0] if ch.isalnum() or ch in '._+-')[:20] or 'player'
                     if len(base) < 3:
@@ -79,8 +82,27 @@ class GoogleLoginView(APIView):
                         tail = str(suffix)
                         username = f'{base[:20-len(tail)]}{tail}'
                         suffix += 1
+                    # Create the Django user for first-time Google sign-in.
+                    # Password is unusable; auth is via the linked SocialAccount.
+                    user = User.objects.create_user(
+                        username=username,
+                        email=email,
+                        password=None,
+                    )
+                    user.set_unusable_password()
+                    user.save(update_fields=['password'])
             if not user.is_active:
                 return Response({'detail': 'This account is inactive.'}, status=403)
+            # Never attach a Google identity to a password account whose email was
+            # not verified: someone could have signed up with another person's
+            # email address first and would keep access through their password.
+            if matched_by_email and user.has_usable_password():
+                verified = bool(email_row and email_row.verified)
+                if not verified:
+                    return Response({
+                        'detail': 'An account with this email already exists. '
+                                  'Please sign in with your username and password.',
+                    }, status=409)
             existing_social = SocialAccount.objects.filter(provider='google', user=user).first()
             if existing_social and existing_social.uid != subject:
                 return Response({'detail': 'This account is already linked to a different Google account.'}, status=409)
@@ -107,7 +129,13 @@ class TokenRefreshView(APIView):
 
     def post(self, request):
         serializer = TokenRefreshSerializer(data=request.data)
-        if not serializer.is_valid():
+        try:
+            valid = serializer.is_valid()
+        except TokenError:
+            # Expired, malformed or blacklisted refresh token (for example after
+            # logout or account deletion): a normal 401, not a server error.
+            return Response({'detail': 'Refresh token is invalid, expired or revoked.'}, status=401)
+        if not valid:
             return Response(serializer.errors, status=401)
         return Response(serializer.validated_data)
 
@@ -167,3 +195,24 @@ class MeView(APIView):
         return Response({'user': _user_payload(request.user)})
 
 
+
+
+class DeleteAccountView(APIView):
+    """Delete (anonymize + deactivate) the signed-in player's account.
+
+    Body: {"confirm": "DELETE", "password": "..."}. The password is required
+    only when the account has one (Google-only accounts have none).
+    """
+    permission_classes = [IsAuthenticated]
+    throttle_scope = 'auth'
+
+    def post(self, request):
+        if str(request.data.get('confirm') or '').strip().upper() != 'DELETE':
+            return Response({'detail': 'Type DELETE to confirm.'}, status=400)
+        user = request.user
+        if user.has_usable_password():
+            if not user.check_password(str(request.data.get('password') or '')):
+                return Response({'detail': 'That password is not correct.'}, status=403)
+        from accounts.account_deletion import delete_account
+        delete_account(user)
+        return Response(status=204)

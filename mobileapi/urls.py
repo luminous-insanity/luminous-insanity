@@ -10,6 +10,7 @@ urlpatterns = [
     path('auth/refresh/', auth.TokenRefreshView.as_view(), name='refresh'),
     path('auth/logout/', auth.LogoutView.as_view(), name='logout'),
     path('me/', auth.MeView.as_view(), name='me'),
+    path('me/delete/', auth.DeleteAccountView.as_view(), name='me-delete'),
     path('games/', games.GamesView.as_view(), name='games'),
     path('picks/', games.PicksView.as_view(), name='picks'),
     path('leaderboard/', games.LeaderboardView.as_view(), name='leaderboard'),

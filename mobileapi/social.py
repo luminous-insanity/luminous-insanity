@@ -1,4 +1,5 @@
 from .common import *
+from .push import send_user_push
 
 class FriendsView(APIView):
     permission_classes = [IsAuthenticated]
@@ -54,6 +55,11 @@ class FriendRequestView(APIView):
             return Response({'detail': 'A request is already pending.'}, status=409)
         row = FriendRequest.objects.create(sender=request.user, receiver=target)
         touch_activity(request.user)
+        send_user_push(
+            target, 'New friend request',
+            f'{request.user.username} wants to connect with you.',
+            preference='friend_requests', data={'type': 'friend_request'},
+        )
         return Response({'id': row.id, 'status': row.status}, status=201)
 
 
@@ -148,6 +154,13 @@ class ChatGameView(APIView):
             )
         except chat.ChatError as exc:
             return Response({'detail': exc.message}, status=exc.status)
+        # Server push for private whispers (never include message body on lock screen).
+        if getattr(msg, 'kind', None) == LiveChatMessage.WHISPER and getattr(msg, 'recipient_id', None):
+            send_user_push(
+                msg.recipient, 'New private whisper',
+                f'{request.user.username} sent you a whisper. Open GameDayPicks to read it.',
+                preference='whispers', data={'type': 'whisper', 'game_id': game.game_id},
+            )
         return Response({'ok': True, 'message': chat.serialize_message(msg, request.user, chat.friend_ids(request.user))}, status=201)
 
 

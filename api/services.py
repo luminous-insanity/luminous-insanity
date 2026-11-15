@@ -329,6 +329,88 @@ def _process_playoff_lifecycle(report):
         config.refresh_from_db(fields=["rounds_cut", "first_playoff_week"])
 
 
+
+# ------------------------------------------------- automatic Super Bowl squares --
+
+def sync_quarter_scores(game):
+    """Record newly completed quarters 1-3 for one game from the box score.
+
+    Only quarters that have no row yet are written, so a hand-entered
+    (manual) score is never overwritten. Returns how many rows were saved.
+    The Final square always uses the game's own final score.
+    """
+    from .models import QuarterScore
+
+    have = set(QuarterScore.objects.filter(game=game).values_list("quarter", flat=True))
+    if {1, 2, 3} <= have:
+        return 0
+    body = _get("getNFLBoxScore", {"gameID": game.game_id})
+    parsed = rules.parse_quarter_scores(body, final=game.is_final)
+    saved = 0
+    for quarter, (home, away) in parsed.items():
+        if quarter in have:
+            continue
+        QuarterScore.objects.update_or_create(
+            game=game, quarter=quarter,
+            defaults={"home_score": home, "away_score": away,
+                      "source": QuarterScore.SYNC},
+        )
+        saved += 1
+    return saved
+
+
+def _process_squares_lifecycle(report):
+    """Deal the board after the last cut, then record quarter scores.
+
+    Uses the same build_board() the staff command uses (50-player rule,
+    random deal, random digits drawn once). Nothing here needs staff action.
+    """
+    from django.db import IntegrityError
+    from accounts.models import PlayoffEntry, SquaresBoard
+    from accounts.playoff_rounds import CUTS, PlayoffError, get_config
+    from accounts.squares import build_board, find_super_bowl_game
+
+    season = settings.NFL_SEASON
+    if not PlayoffEntry.objects.filter(season=season).exists():
+        return
+    config = get_config(season)
+
+    board = SquaresBoard.objects.filter(season=season).first()
+    if board is None:
+        if config.rounds_cut < CUTS:
+            return
+        try:
+            board = build_board(season)
+        except PlayoffError as exc:
+            log.info("Automatic squares build deferred for %s: %s", season, exc)
+            return
+        except IntegrityError:
+            board = SquaresBoard.objects.filter(season=season).first()
+            if board is None:
+                return
+        else:
+            report.setdefault("playoff_actions", []).append(
+                {"action": "squares_built", "season": season})
+
+    game = board.game or find_super_bowl_game(season, config)
+    if game is not None and board.game_id is None:
+        board.game = game
+        board.save(update_fields=["game"])
+    if game is None or str(game.game_id).startswith("manual-"):
+        return
+    if timezone.now() < game.lock_at:
+        return
+    try:
+        saved = sync_quarter_scores(game)
+    except ApiError as exc:
+        log.warning("Quarter scores not loaded for %s: %s", game.game_id, exc)
+        report.setdefault("squares_warnings", []).append(str(exc))
+        return
+    if saved:
+        report.setdefault("playoff_actions", []).append(
+            {"action": "quarter_scores", "game": game.game_id, "saved": saved})
+
+
 # ---------------------------------------------------------------- run_sync --
 
 def run_sync():
@@ -388,6 +470,18 @@ def run_sync():
     # 5. Freeze the existing qualification result and process any fully
     # completed playoff rounds. Safe to retry on every scheduled sync.
     _process_playoff_lifecycle(report)
+
+    # 6. Squares (deal the board, record quarter scores) and the weekly pick
+    # reminder. Each is isolated so a problem here can never fail the sync.
+    try:
+        _process_squares_lifecycle(report)
+    except Exception:
+        log.exception("Squares lifecycle failed")
+    try:
+        from mobileapi.reminders import send_pick_reminders
+        report["reminders"] = send_pick_reminders()
+    except Exception:
+        log.exception("Pick reminders failed")
 
     report["current_week"] = current_week()
     return report

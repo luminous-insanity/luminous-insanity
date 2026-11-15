@@ -20,3 +20,4 @@ djangorestframework==3.18.3
 djangorestframework_simplejwt==5.5.1
 google-auth==2.35.0
 sentry-sdk==2.19.2
+firebase-admin==6.6.0

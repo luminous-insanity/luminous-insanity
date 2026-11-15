@@ -1,4 +1,5 @@
 from .common import *
+from .push import send_user_push
 
 class ChallengesView(APIView):
     permission_classes = [IsAuthenticated]
@@ -54,6 +55,11 @@ class ChallengesView(APIView):
                 return Response({'detail': 'Scope must be game or week.'}, status=400)
         except ChallengeError as exc:
             return Response({'detail': str(exc)}, status=400)
+        send_user_push(
+            opponent, 'New GameDayPicks challenge',
+            f'{request.user.username} challenged you for week {getattr(challenge, "week", "")}.'.strip(),
+            preference='challenges', data={'type': 'challenge', 'challenge_id': str(challenge.pk)},
+        )
         return Response({'id': challenge.id, 'status': challenge.status}, status=201)
 
 

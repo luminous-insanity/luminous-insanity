@@ -24,6 +24,7 @@ from accounts.standings import compute_standings
 from accounts.challenges import records as challenge_records
 from accounts.confidence import confidence_points_for_user
 from accounts.playoff_cuts import tiebreak_draw
+from accounts.playoff_all_active import apply_all_active_rule
 
 from accounts.playoff_qualification import (
     PlayerRecord,
@@ -83,7 +84,9 @@ def build_player_records(
     (for final membership).
     """
     if users is None:
-        users = list(User.objects.filter(is_superuser=False))
+        # Deleted/deactivated accounts can no longer play, so they never count
+        # toward N or take a playoff seat.
+        users = list(User.objects.filter(is_superuser=False, is_active=True))
     user_ids = [u.id for u in users]
 
     # Standings (wins/losses/ties) up to through_week
@@ -190,6 +193,15 @@ def run_qualification(
         k=k,
         lambda_mult=lambda_mult,
         force_N=snapshot_n,
+        sealed_draws=draws,
+    )
+
+    # Small leagues: when 50 or fewer players are active, all of them qualify
+    # (and the weekly cuts keep everyone). Setting PLAYOFF_ALL_ACTIVE_MAX=0
+    # restores the unmodified capacity algorithm.
+    result = apply_all_active_rule(
+        result, players,
+        getattr(settings, 'PLAYOFF_ALL_ACTIVE_MAX', 0),
         sealed_draws=draws,
     )
 
